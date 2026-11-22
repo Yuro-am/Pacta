@@ -42,8 +42,8 @@ const avatars = ["#e8dcff", "#ffdfcf", "#dcf2e7", "#ffdced"];
 export default function Home() {
   const [view, setView] = useState<View>("Inicio");
   const [localDebts, setLocalDebts] = useState<Debt[]>([]);
-  const [shared, setShared] = useState<{ actor: string; debts: Debt[] } | null>(null);
-  const [socialState, setSocialState] = useState<{ actor: string; data: SocialData } | null>(null);
+  const [shared, setShared] = useState<{ actor: string; debts: Debt[]; signature?: string } | null>(null);
+  const [socialState, setSocialState] = useState<{ actor: string; data: SocialData; signature: string } | null>(null);
   const [socialUnavailableFor, setSocialUnavailableFor] = useState<string | null>(null);
   const socialRevision = useRef(0);
   const socialActionInProgress = useRef(false);
@@ -184,7 +184,12 @@ export default function Home() {
         if (controller.signal.aborted || revision !== sharedRevision.current) return;
         setSharedError(error ? { actor: userId, missing: ["42P01", "PGRST205"].includes(error.code) } : null);
         if (data) {
-          setShared({ actor: userId, debts: (data as SharedDebtRow[]).map((row) => describeSharedDebt(row, userId)) });
+          const signature = JSON.stringify(data);
+          setShared((previous) => previous?.actor === userId && previous.signature === signature ? previous : {
+            actor: userId,
+            debts: (data as SharedDebtRow[]).map((row) => describeSharedDebt(row, userId)),
+            signature,
+          });
         }
       } catch {
         if (!controller.signal.aborted && revision === sharedRevision.current) setSharedError({ actor: userId, missing: false });
@@ -226,7 +231,9 @@ export default function Home() {
     const { data, error } = await client.rpc("pacta_social");
     if (revision !== socialRevision.current) return;
     if (data && !error) {
-      setSocialState({ actor: userId, data });
+      const signature = JSON.stringify(data);
+      setSocialState((previous) => previous?.actor === userId && previous.signature === signature
+        ? previous : { actor: userId, data, signature });
       setSocialUnavailableFor(null);
     } else {
       setSocialUnavailableFor(userId);
@@ -455,7 +462,7 @@ export default function Home() {
         if (!data) return "No se pudo borrar. La deuda puede estar ya compartida o borrada.";
         sharedRevision.current++;
         setShared((previous) => previous?.actor === userId
-          ? { ...previous, debts: previous.debts.filter((item) => item.id !== debt.id) }
+          ? { actor: userId, debts: previous.debts.filter((item) => item.id !== debt.id) }
           : previous);
       } catch {
         return "No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.";
@@ -586,15 +593,15 @@ export default function Home() {
             ? "Las invitaciones aún no están activadas. Puedes seguir usando tus deudas locales."
             : "No se pudieron cargar las deudas compartidas."}</p>}
           {invite && dialog !== "invite" && <button className="secondary invitation-button" onClick={() => setDialog("invite")}>Abrir invitación pendiente</button>}
+          <div className="view-content" key={view}>
           {view === "Inicio" ? <>
             <div className="page-heading">
-              <div><h1>¡Hola, {firstName}! <span className="wave">👋</span></h1><p>Así van vuestras cuentas entre amigos.</p></div>
+              <div><h1>¡Hola, {firstName}!</h1></div>
               <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button>
             </div>
 
             <section className="balance" aria-label="Resumen de saldo">
-              <div className="balance-decoration" aria-hidden="true"><span /><span /><span /><span /></div>
-              <div className="balance-label"><Wallet size={17} /> Tu balance</div>
+              <h2 className="balance-label"><span><Wallet size={17} /></span> Tu balance</h2>
               <div className="balance-grid">
                 <div><span><ArrowDownLeft size={16} /> Te deben</span><strong>{euros(owed)}</strong></div>
                 <div><span><ArrowUpRight size={16} /> Debes</span><strong>{euros(owe)}</strong></div>
@@ -640,6 +647,7 @@ export default function Home() {
             )}</div>
             {debtList(visibleDebts)}
           </>}
+          </div>
         </div>
       </main>
 

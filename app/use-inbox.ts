@@ -5,7 +5,7 @@ import type { InboxData } from "../lib/inbox";
 import type { createClient } from "../utils/supabase/client";
 
 export function useInbox(client: ReturnType<typeof createClient>, userId?: string) {
-  const [result, setResult] = useState<{ actor: string; inbox?: InboxData } | null>(null);
+  const [result, setResult] = useState<{ actor: string; inbox?: InboxData; signature?: string } | null>(null);
   const request = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => {
@@ -16,8 +16,13 @@ export function useInbox(client: ReturnType<typeof createClient>, userId?: strin
     try {
       const { data, error } = await client.rpc("pacta_inbox").abortSignal(controller.signal);
       if (controller.signal.aborted) return;
-      setResult((previous) => error && previous?.actor === userId && previous.inbox
-        ? previous : { actor: userId, inbox: error ? undefined : data });
+      if (error) {
+        setResult((previous) => previous?.actor === userId ? previous : { actor: userId });
+        return;
+      }
+      const signature = JSON.stringify(data);
+      setResult((previous) => previous?.actor === userId && previous.signature === signature
+        ? previous : { actor: userId, inbox: data, signature });
     } catch {
       if (!controller.signal.aborted) setResult((previous) => previous?.actor === userId ? previous : { actor: userId });
     } finally {
