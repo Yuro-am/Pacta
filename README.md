@@ -77,3 +77,7 @@ En Supabase, ejecuta [202611220003_friends_and_groups.sql](supabase/migrations/2
 En PACTA, inicia sesión y abre **Grupos**. Escribe el correo exacto o el código de amigo de la otra persona, envía una solicitud y pídele que pulse **Aceptar** en su sección **Amigos**. A partir de entonces puedes seleccionar a esa persona al registrar una deuda. La verá en **Actividad** desde su cuenta.
 
 En **Grupos**, crea un grupo, ábrelo y selecciona a un amigo para invitarlo. La otra persona acepta desde esa misma sección. Para añadir una deuda al grupo, ábrelo y pulsa **Nueva deuda** o **Añadir**. Una deuda sigue siendo privada entre las dos personas implicadas, incluso dentro de un grupo.
+
+## Chat entre amigos
+
+Ejecuta [202611220004_friend_chat.sql](supabase/migrations/202611220004_friend_chat.sql) en Supabase después de activar Amigos y Grupos. En **Grupos → Mis amigos**, pulsa **Chat** al lado de una amistad aceptada. La conversación es privada y muestra los 50 mensajes más recientes. El chat se actualiza mientras está abierto.

@@ -9,7 +9,8 @@ import {
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
 import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/shared-debts";
-import type { SocialData } from "../lib/social";
+import type { Person, SocialData } from "../lib/social";
+import { ChatDialog } from "./chat";
 import { GroupInvite, SocialPanel } from "./social";
 import { ProfileDialog, useProfile } from "./profile";
 
@@ -44,6 +45,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | null>(null);
+  const [chatFriend, setChatFriend] = useState<Person | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState<"Todo" | "Pendientes" | "Saldadas">("Todo");
@@ -51,6 +53,7 @@ export default function Home() {
   const profile = useProfile();
   const { client } = profile;
   const userId = profile.user?.id;
+  useEffect(() => { setChatFriend(null); }, [userId]);
   const sharedUnavailable = sharedError?.actor === userId && sharedError?.missing;
   const usingShared = Boolean(userId && !sharedUnavailable);
   const social = socialState?.actor === userId ? socialState?.data : undefined;
@@ -466,7 +469,7 @@ export default function Home() {
               )}</div>
               <div className="section-heading"><h2>Movimientos del grupo</h2></div>
               {debtList(visibleDebts)}
-            </> : userId ? (social ? <SocialPanel data={social} userId={userId} run={runSocialAction} openGroup={showGroup} />
+            </> : userId ? (social ? <SocialPanel data={social} userId={userId} run={runSocialAction} openGroup={showGroup} openChat={setChatFriend} />
               : <p role="status">{socialUnavailableFor === userId ? "Amigos y grupos aún no están disponibles. Comprueba la configuración de Supabase." : "Cargando amigos y grupos…"}</p>)
               : <><button className="secondary invitation-button" onClick={() => setDialog("profile")}>Inicia sesión para añadir amigos y grupos</button>
                 <div className="groups-page">{groupList()}</div></>}
@@ -488,8 +491,11 @@ export default function Home() {
         <button onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
 
-      {(dialog || active) && <Modal close={() => { setDialog(null); setSelected(null); }}>
-        {dialog === "invite" ? <>
+      {(dialog || active || (chatFriend && client && userId)) && <Modal close={() => {
+        setDialog(null); setSelected(null); setChatFriend(null);
+      }}>
+        {chatFriend && client && userId ? <ChatDialog key={`${userId}:${chatFriend.id}`} client={client} userId={userId} friend={chatFriend} />
+          : dialog === "invite" ? <>
           <h2 id="dialog-title">Invitación de PACTA</h2>
           <p className="dialog-description">{!invite ? "Este enlace no es válido." : !client
             ? "La versión actual necesita conectar Supabase para abrir deudas compartidas."
