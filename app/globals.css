@@ -230,3 +230,5 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 850; letter-spacing: -.06
 .form .debt-direction label { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
 .form .debt-direction label:has(input:checked) { background: #f5efff; border-color: #9b7cec; }
 .form .debt-direction input { width: auto; accent-color: var(--purple); }
+
+.welcome-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }

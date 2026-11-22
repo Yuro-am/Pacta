@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { isAuthError, isAuthRetryableFetchError, type AuthError, type User } from "@supabase/supabase-js";
 import { createClient } from "../utils/supabase/client";
 
-const defaultName = "Álex García";
+const defaultName = "Invitado";
 const nameKey = "pacta-profile-name-v1";
 const usernamePattern = "[a-zA-Z0-9_]{3,24}";
 
@@ -60,7 +60,7 @@ function authErrorMessage(error: AuthError) {
   }
 }
 
-type ProfileMode = "profile" | "login" | "register";
+type ProfileMode = "profile" | "login" | "register" | "access";
 
 export function ProfileDialog({ profile, initialMode = "profile" }: {
   profile: ReturnType<typeof useProfile>;
@@ -243,6 +243,15 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
     }
   }
 
+  if (mode === "access" && !user) return <div className="welcome">
+    <h2 id="dialog-title">Entra en PACTA</h2>
+    <p>Inicia sesión o crea una cuenta para compartir deudas y chatear con tus amigos.</p>
+    <div className="welcome-actions">
+      <button className="primary" onClick={() => switchMode("register")}>Crear cuenta</button>
+      <button className="secondary" onClick={() => switchMode("login")}>Iniciar sesión</button>
+    </div>
+  </div>;
+
   return <>
     <h2 id="dialog-title">{showProfile ? "Mi perfil" : mode === "register" ? "Crear cuenta" : "Iniciar sesión"}</h2>
     <p className="dialog-description">{user ? user.email : showProfile
@@ -280,7 +289,9 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
             </button>}
             {mode !== "login" && <button className="secondary" disabled={busy} onClick={() => switchMode("login")}>Iniciar sesión</button>}
             {mode !== "register" && <button className="secondary" disabled={busy} onClick={() => switchMode("register")}>Crear cuenta</button>}
-            {!showProfile && <button className="secondary" disabled={busy} onClick={() => switchMode("profile")}>Volver a mi perfil</button>}
+            {!showProfile && <button className="secondary" disabled={busy} onClick={() => switchMode(initialMode === "access" ? "access" : "profile")}>
+              {initialMode === "access" ? "Volver" : "Volver a mi perfil"}
+            </button>}
           </> : <p>La creación de cuentas estará disponible cuando se configure Supabase.</p>}
       </div>
       {feedback && <p className="dialog-description" role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}

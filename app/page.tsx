@@ -33,6 +33,7 @@ const methods: { name: Method; icon: typeof Wallet }[] = [
 const kindIcons = { food: Pizza, trip: Plane, drink: Coffee, other: ReceiptText };
 const groupIcons = { pizza: Pizza, plane: Plane, house: House };
 const kindColors = { food: "peach", trip: "lilac", drink: "mint", other: "sand" };
+const firstAccessKey = "pacta-first-access-v1";
 const avatars = ["#e8dcff", "#ffdfcf", "#dcf2e7", "#ffdced"];
 
 export default function Home() {
@@ -49,7 +50,8 @@ export default function Home() {
   const [inviteError, setInviteError] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | "messages" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | "messages" | "access" | null>(null);
+  const checkedFirstAccess = useRef(false);
   const messageArea = useRef<HTMLDivElement>(null);
   const messageButton = useRef<HTMLButtonElement>(null);
   const [chatFriend, setChatFriend] = useState<Person | null>(null);
@@ -133,6 +135,16 @@ export default function Home() {
     }
     window.history.replaceState(window.history.state, "", url);
   }, []);
+
+  useEffect(() => {
+    if (!ready || profile.loading || !client || checkedFirstAccess.current) return;
+    checkedFirstAccess.current = true;
+    try {
+      if (localStorage.getItem(firstAccessKey)) return;
+      localStorage.setItem(firstAccessKey, "1");
+    } catch { /* The menu can still open when storage is unavailable. */ }
+    if (!userId) setDialog((current) => current ?? "access");
+  }, [client, ready, profile.loading, userId]);
 
   useEffect(() => {
     if (ready) {
@@ -606,8 +618,8 @@ export default function Home() {
               <button className="primary" onClick={() => setDialog("register")}>Crear cuenta</button>
             </div>)}
           {inviteError && <p role="alert" className="dialog-description">{inviteError}</p>}
-        </> : (dialog === "profile" || dialog === "register") ? <ProfileDialog
-          profile={profile} initialMode={dialog === "register" ? "register" : invite ? "login" : "profile"} /> : dialog === "welcome" ? <div className="welcome">
+        </> : (dialog === "profile" || dialog === "register" || dialog === "access") ? <ProfileDialog
+          profile={profile} initialMode={dialog === "access" ? "access" : dialog === "register" ? "register" : invite ? "login" : "profile"} /> : dialog === "welcome" ? <div className="welcome">
           <span className="brand-mark"><Handshake size={39} /></span>
           <h2 id="dialog-title">Bienvenido a PACTA<span className="brand-dot">.</span></h2>
           <p>Comparte gastos y salda cuentas a vuestra manera. Elegid entre dinero, comida, bebidas, favores y otras recompensas.</p>
