@@ -1,12 +1,14 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { Send, Smile } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type { Person } from "../lib/social";
 import type { createClient } from "../utils/supabase/client";
 
-type Message = { id: string; sender_id: string; body: string; created_at: string };
-const messageFields = "id,sender_id,body,created_at";
+import { VoiceComposer, VoicePlayer, voiceBucket, type VoiceRecording } from "./voice-note";
+
+type Message = { id: string; sender_id: string; body: string; created_at: string; audio_path?: string | null };
+const emojis = ["😀", "😂", "😊", "😍", "😅", "🥲", "😎", "🤝", "👍", "🙌", "❤️", "🔥", "🎉", "🍕", "🍻", "💸"];
 const messageTime = new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" });
 
 export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
@@ -17,6 +19,8 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
   onChange: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const textField = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -34,7 +38,7 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
     inFlight.current = true;
     const startedAt = revision.current;
     try {
-      const query = client.from("pacta_messages").select(messageFields)
+      const query = client.from("pacta_messages").select("*")
         .or(`and(sender_id.eq.${userId},recipient_id.eq.${friend.id}),and(sender_id.eq.${friend.id},recipient_id.eq.${userId})`)
         .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(50);
       const { data, error } = await (signal ? query.abortSignal(signal) : query);
@@ -90,6 +94,19 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
     }
   }, [messages]);
 
+  async function sendMessage(id: string, body: string, audioPath?: string) {
+    const { data, error } = await client.from("pacta_messages")
+      .upsert({ id, recipient_id: friend.id, body, ...(audioPath ? { audio_path: audioPath } : {}) }, { ignoreDuplicates: true })
+      .select("*").maybeSingle();
+    if (error) throw error;
+    revision.current++;
+    stickToBottom.current = true;
+    if (data) setMessages((previous) => [...previous.filter((item) => item.id !== data.id), data].slice(-50));
+    if (history.current) history.current.scrollTop = history.current.scrollHeight;
+    onChange();
+    void refresh();
+  }
+
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = draft.trim();
@@ -99,23 +116,50 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
     setSending(true);
     setSendError("");
     try {
-      const { data, error } = await client.from("pacta_messages")
-        .upsert({ id, recipient_id: friend.id, body }, { ignoreDuplicates: true })
-        .select(messageFields).maybeSingle();
-      if (error) throw error;
-      revision.current++;
+      await sendMessage(id, body);
       pending.current = null;
-      stickToBottom.current = true;
-      if (data) setMessages((previous) => [...previous.filter((item) => item.id !== data.id), data].slice(-50));
-      if (history.current) history.current.scrollTop = history.current.scrollHeight;
       setDraft("");
-      onChange();
-      void refresh();
+      setEmojiOpen(false);
     } catch {
       setSendError("No se pudo enviar. El mensaje sigue en el cuadro de texto para que puedas reintentarlo.");
     } finally {
       setSending(false);
     }
+  }
+
+  async function sendAudio(recording: VoiceRecording) {
+    if (sending) return false;
+    setSending(true);
+    setSendError("");
+    const path = `${userId}/${friend.id}/${recording.id}.${recording.extension}`;
+    try {
+      const { error } = await client.storage.from(voiceBucket).upload(path, recording.blob, {
+        contentType: recording.blob.type,
+        upsert: false,
+      });
+      if (error && error.status !== 409 && error.statusCode !== "409") throw error;
+      await sendMessage(recording.id, "Mensaje de voz", path);
+      return true;
+    } catch {
+      setSendError("No se pudo enviar el audio. La grabación sigue disponible para reintentar.");
+      return false;
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function insertEmoji(emoji: string) {
+    const field = textField.current;
+    const start = field?.selectionStart ?? draft.length;
+    const end = field?.selectionEnd ?? start;
+    const next = draft.slice(0, start) + emoji + draft.slice(end);
+    if (next.length > 1000) return;
+    setDraft(next);
+    setEmojiOpen(false);
+    requestAnimationFrame(() => {
+      field?.focus();
+      field?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
   }
 
   return <>
@@ -128,13 +172,21 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
       {loadError && <p role="status">{loadError} <button className="back" onClick={() => refresh()}>Reintentar</button></p>}
       {!loading && !loadError && !messages.length && <p>Escribe el primer mensaje.</p>}
       {messages.map((message) => <div className={message.sender_id === userId ? "chat-bubble chat-mine" : "chat-bubble"} key={message.id}>
-        <p>{message.body}</p>
+        {message.audio_path ? <VoicePlayer client={client} path={message.audio_path} /> : <p>{message.body}</p>}
         <time dateTime={message.created_at}>{messageTime.format(new Date(message.created_at))}</time>
       </div>)}
     </div>
     <form className="form" onSubmit={send}>
-      <label>Mensaje<textarea value={draft} onChange={(event) => setDraft(event.target.value)}
+      <label>Mensaje<textarea ref={textField} value={draft} onChange={(event) => setDraft(event.target.value)}
         disabled={sending} rows={2} maxLength={1000} required placeholder="Escribe a tu amigo…" /></label>
+      <div className="chat-tools">
+        <button className="icon-button" type="button" disabled={sending} aria-label="Emojis" title="Emojis"
+          aria-expanded={emojiOpen} onClick={() => setEmojiOpen(!emojiOpen)}><Smile size={19} /></button>
+        <VoiceComposer sending={sending} send={sendAudio} />
+      </div>
+      {emojiOpen && <div className="emoji-picker" role="group" aria-label="Seleccionar emoji">
+        {emojis.map((emoji) => <button type="button" disabled={sending} key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}
+      </div>}
       <button className="primary" disabled={sending || !draft.trim()}><Send size={16} />{sending ? "Enviando…" : "Enviar mensaje"}</button>
       {sendError && <p role="alert">{sendError}</p>}
     </form>

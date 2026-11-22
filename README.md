@@ -105,3 +105,7 @@ Para asignar importes distintos, ejecuta [202611220009_custom_group_split.sql](s
 ## Deudas compartidas en tiempo real
 
 Ejecuta [202611220010_realtime_debts.sql](supabase/migrations/202611220010_realtime_debts.sql) en Supabase una vez para activar Realtime en la tabla de deudas. Cuando la app está abierta, las deudas nuevas y los cambios en propuestas o pagos actualizan Actividad, la ficha y la campana. Si se corta la conexión en tiempo real, PACTA sigue consultando los cambios automáticamente.
+
+### Audios y emojis
+
+Ejecuta [202611220011_chat_voice_notes.sql](supabase/migrations/202611220011_chat_voice_notes.sql) después de la migración de chat para activar las notas de voz. En un chat, pulsa el micrófono, graba hasta un minuto y escucha la vista previa antes de enviar. Solo los participantes pueden descargar la grabación del almacenamiento privado. La cara sonriente abre el selector de emojis del mensaje.
