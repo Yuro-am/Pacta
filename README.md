@@ -101,3 +101,7 @@ Ejecuta [202611220007_group_debt_split.sql](supabase/migrations/202611220007_gro
 Ejecuta [202611220008_group_balances.sql](supabase/migrations/202611220008_group_balances.sql) en Supabase después de activar Amigos y Grupos. En **Grupos → Abrir**, la tabla **Saldo por persona** muestra lo que debe y lo que le deben a cada miembro dentro de ese grupo. Solo los miembros aceptados pueden consultar el resumen. La tabla cuenta las deudas pendientes entre miembros y excluye las saldadas. Cada movimiento individual sigue siendo visible únicamente para las dos cuentas implicadas.
 
 Para asignar importes distintos, ejecuta [202611220009_custom_group_split.sql](supabase/migrations/202611220009_custom_group_split.sql) después de la migración de reparto. En **Nueva deuda → Todo un grupo**, elige **Me deben** o **Yo debo**, selecciona **Importe por persona** y escribe lo que corresponde a cada miembro. Un importe de 0 € deja a esa persona fuera del reparto.
+
+## Deudas compartidas en tiempo real
+
+Ejecuta [202611220010_realtime_debts.sql](supabase/migrations/202611220010_realtime_debts.sql) en Supabase una vez para activar Realtime en la tabla de deudas. Cuando la app está abierta, las deudas nuevas y los cambios en propuestas o pagos actualizan Actividad, la ficha y la campana. Si se corta la conexión en tiempo real, PACTA sigue consultando los cambios automáticamente.

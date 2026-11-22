@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
+import { watchSharedDebts } from "../lib/debt-realtime";
 import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/shared-debts";
 import type { DebtNotice } from "../lib/inbox";
 import type { Person, SocialData } from "../lib/social";
@@ -164,34 +165,60 @@ export default function Home() {
 
   useEffect(() => {
     if (!client || !userId) return;
-    let active = true;
     let inFlight = false;
+    let queued = false;
+    let liveTimer: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
 
     async function refresh() {
-      if (!client || !userId || inFlight || document.hidden) return;
+      if (!client || !userId || controller.signal.aborted || document.hidden) return;
+      if (inFlight) {
+        queued = true;
+        return;
+      }
       inFlight = true;
       const revision = ++sharedRevision.current;
-      const { data, error } = await client.from("shared_debts").select("*")
-        .order("created_at", { ascending: false }).abortSignal(controller.signal);
-      inFlight = false;
-      if (!active || revision !== sharedRevision.current) return;
-      setSharedError(error ? { actor: userId, missing: ["42P01", "PGRST205"].includes(error.code) } : null);
-      if (data) {
-        setShared({ actor: userId, debts: (data as SharedDebtRow[]).map((row) => describeSharedDebt(row, userId)) });
+      try {
+        const { data, error } = await client.from("shared_debts").select("*")
+          .order("created_at", { ascending: false }).abortSignal(controller.signal);
+        if (controller.signal.aborted || revision !== sharedRevision.current) return;
+        setSharedError(error ? { actor: userId, missing: ["42P01", "PGRST205"].includes(error.code) } : null);
+        if (data) {
+          setShared({ actor: userId, debts: (data as SharedDebtRow[]).map((row) => describeSharedDebt(row, userId)) });
+        }
+      } catch {
+        if (!controller.signal.aborted && revision === sharedRevision.current) setSharedError({ actor: userId, missing: false });
+      } finally {
+        inFlight = false;
+        if (queued) {
+          queued = false;
+          void refresh();
+        }
       }
     }
 
+    function refreshFromEvent() {
+      if (controller.signal.aborted || liveTimer) return;
+      liveTimer = setTimeout(() => {
+        liveTimer = undefined;
+        if (document.hidden) return;
+        void refresh();
+        void refreshInbox();
+      }, 80);
+    }
+
     void refresh();
+    const stopWatching = watchSharedDebts(client, userId, refreshFromEvent);
     const timer = window.setInterval(refresh, 15000);
     document.addEventListener("visibilitychange", refresh);
     return () => {
-      active = false;
       controller.abort();
+      stopWatching();
+      clearTimeout(liveTimer);
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [client, userId]);
+  }, [client, userId, refreshInbox]);
 
   const refreshSocial = useCallback(async () => {
     if (!client || !userId) return;
