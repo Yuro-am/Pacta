@@ -67,6 +67,8 @@ export default function Home() {
   const { client } = profile;
   const userId = profile.user?.id;
   const { inbox, refresh: refreshInbox } = useInbox(client, userId);
+  const recentChats = [...(inbox?.conversations ?? [])]
+    .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at)).slice(0, 4);
 
   useEffect(() => {
     if (dialog !== "messages") return;
@@ -506,15 +508,7 @@ export default function Home() {
     </div>;
   }
 
-  function groupList() {
-    if (userId) {
-      const members = social?.groups.filter((item) => item.accepted) ?? [];
-      return <div className="group-list">{members.length ? members.map((item) => <button key={item.id} className="group-row" onClick={() => showGroup(item.id)}>
-        <span className="tile lilac"><UsersRound size={21} /></span>
-        <span className="row-copy"><strong>{item.name}</strong><small>{item.members.length} miembros</small></span>
-        <ChevronRight className="row-chevron" size={16} />
-      </button>) : <p className="empty">Aquí aparecerán los grupos que crees o aceptes.</p>}</div>;
-    }
+  function demoGroupList() {
     return <div className="group-list">{groups.map((item) => {
       const Icon = groupIcons[item.symbol];
       return <button key={item.name} className="group-row" onClick={() => showGroup(item.name)}>
@@ -614,8 +608,14 @@ export default function Home() {
                 {debtList(debts.slice(0, 4))}
               </section>
               <section>
-                <div className="section-heading"><h2>Tus grupos</h2><button onClick={() => navigate("Grupos")}>Ver todos <ArrowRight size={15} /></button></div>
-                {groupList()}
+                <div className="section-heading">
+                  <h2>Chats recientes</h2>
+                  {userId && <button onClick={() => {
+                    setDialog("messages"); void refreshInbox();
+                  }}>Ver todos <ArrowRight size={15} /></button>}
+                </div>
+                {userId ? <MessageList conversations={recentChats} onOpen={openChat} />
+                  : <div className="debt-list"><p className="empty">Inicia sesión para ver tus chats.</p></div>}
               </section>
             </div>
           </> : view === "Grupos" ? <>
@@ -638,7 +638,7 @@ export default function Home() {
             </> : userId ? (social ? <SocialPanel data={social} run={runSocialAction} openGroup={showGroup} openChat={openChat} />
               : <p role="status">{socialUnavailableFor === userId ? "Amigos y grupos aún no están disponibles. Comprueba la configuración de Supabase." : "Cargando amigos y grupos…"}</p>)
               : <><button className="secondary invitation-button" onClick={() => setDialog("profile")}>Inicia sesión para añadir amigos y grupos</button>
-                <div className="groups-page">{groupList()}</div></>}
+                <div className="groups-page">{demoGroupList()}</div></>}
           </> : <>
             <div className="page-heading"><div><h1>Actividad</h1><p>Consulta tus deudas, propuestas y pagos.</p></div>
             <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
