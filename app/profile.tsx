@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { isAuthError, isAuthRetryableFetchError, type AuthError, type User } from "@supabase/supabase-js";
 import { createClient } from "../utils/supabase/client";
 
@@ -62,9 +62,10 @@ function authErrorMessage(error: AuthError) {
 
 type ProfileMode = "profile" | "login" | "register" | "access";
 
-export function ProfileDialog({ profile, initialMode = "profile" }: {
+export function ProfileDialog({ profile, initialMode = "profile", appearance }: {
   profile: ReturnType<typeof useProfile>;
   initialMode?: ProfileMode;
+  appearance?: ReactNode;
 }) {
   const { client, user, name, loading, saveDemoName } = profile;
   const [mode, setMode] = useState<ProfileMode>(initialMode);
@@ -295,6 +296,7 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
           </> : <p>La creación de cuentas estará disponible cuando se configure Supabase.</p>}
       </div>
       {feedback && <p className="dialog-description" role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}
+      {showProfile && appearance && <div className="profile-appearance">{appearance}</div>}
     </>}
   </>;
 }

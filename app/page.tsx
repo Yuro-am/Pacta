@@ -16,6 +16,7 @@ import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
 import { GroupBalances } from "./group-balances";
 import { GroupInvite, SocialPanel } from "./social";
+import { AppearancePicker, useAppearance } from "./appearance";
 import { NewDebtForm, type GroupSplit } from "./new-debt";
 import { ProfileDialog, useProfile } from "./profile";
 
@@ -60,6 +61,7 @@ export default function Home() {
   const [filter, setFilter] = useState<"Todo" | "Pendientes" | "Saldadas">("Todo");
   const [message, setMessage] = useState("");
   const profile = useProfile();
+  const appearance = useAppearance();
   const { client } = profile;
   const userId = profile.user?.id;
   const { inbox, refresh: refreshInbox } = useInbox(client, userId);
@@ -495,6 +497,7 @@ export default function Home() {
           )}
         </nav>
         <div className="sidebar-bottom">
+          <AppearancePicker {...appearance} />
           <button className="help" onClick={() => setDialog("welcome")}><CircleHelp size={19} /> Sobre Pacta</button>
           <button className="profile" onClick={() => setDialog("profile")} aria-label="Mi perfil"><span className="avatar">{initial}</span><span><strong>{profile.name}</strong><small>Mi espacio personal</small></span></button>
         </div>
@@ -619,7 +622,7 @@ export default function Home() {
             </div>)}
           {inviteError && <p role="alert" className="dialog-description">{inviteError}</p>}
         </> : (dialog === "profile" || dialog === "register" || dialog === "access") ? <ProfileDialog
-          profile={profile} initialMode={dialog === "access" ? "access" : dialog === "register" ? "register" : invite ? "login" : "profile"} /> : dialog === "welcome" ? <div className="welcome">
+          profile={profile} appearance={<AppearancePicker {...appearance} />} initialMode={dialog === "access" ? "access" : dialog === "register" ? "register" : invite ? "login" : "profile"} /> : dialog === "welcome" ? <div className="welcome">
           <span className="brand-mark"><Handshake size={39} /></span>
           <h2 id="dialog-title">Bienvenido a PACTA<span className="brand-dot">.</span></h2>
           <p>Comparte gastos y salda cuentas a vuestra manera. Elegid entre dinero, comida, bebidas, favores y otras recompensas.</p>

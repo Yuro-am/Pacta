@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { themeKey } from "../lib/appearance";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="es"><body>{children}</body></html>;
+  const initializeTheme = `try{if(localStorage.getItem(${JSON.stringify(themeKey)})==="dark")document.documentElement.dataset.theme="dark"}catch{}`;
+  return <html lang="es" suppressHydrationWarning>
+    <head><script dangerouslySetInnerHTML={{ __html: initializeTheme }} /></head>
+    <body>{children}</body>
+  </html>;
 }
