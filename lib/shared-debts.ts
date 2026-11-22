@@ -6,6 +6,7 @@ export type SharedDebtRow = {
   created_at: string;
   owner_id: string;
   guest_id: string | null;
+  group_id?: string | null;
   owner_name: string;
   guest_name: string;
   owner_owes: boolean;
@@ -27,7 +28,7 @@ export function describeSharedDebt(row: SharedDebtRow, userId: string): Debt {
     direction: isOwner === row.owner_owes ? "owe" : "owed",
     stage: row.stage,
     date: new Date(row.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short" }),
-    group: "",
+    group: row.group_id ?? "",
     kind: "other",
     offer: row.method && row.detail ? { method: row.method, detail: row.detail } : undefined,
     shared: {

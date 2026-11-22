@@ -69,3 +69,11 @@ PACTA empieza con el saldo a cero para quienes aún no registraron deudas. Los m
 Abre la deuda en **Actividad**, pulsa **Borrar deuda** y confirma. Se pueden borrar las deudas locales y las invitaciones aún sin aceptar. Cuando un amigo ya aceptó, la deuda queda visible para ambas cuentas.
 
 En Supabase, ejecuta [202611220002_delete_unclaimed_debts.sql](supabase/migrations/202611220002_delete_unclaimed_debts.sql) después de la migración inicial para habilitar el borrado de invitaciones pendientes.
+
+## Añadir amigos y crear grupos
+
+En Supabase, ejecuta [202611220003_friends_and_groups.sql](supabase/migrations/202611220003_friends_and_groups.sql) una vez después de la migración inicial de deudas.
+
+En PACTA, inicia sesión y abre **Grupos**. Escribe el correo exacto o el código de amigo de la otra persona, envía una solicitud y pídele que pulse **Aceptar** en su sección **Amigos**. A partir de entonces puedes seleccionar a esa persona al registrar una deuda. La verá en **Actividad** desde su cuenta.
+
+En **Grupos**, crea un grupo, ábrelo y selecciona a un amigo para invitarlo. La otra persona acepta desde esa misma sección. Para añadir una deuda al grupo, ábrelo y pulsa **Nueva deuda** o **Añadir**. Una deuda sigue siendo privada entre las dos personas implicadas, incluso dentro de un grupo.
