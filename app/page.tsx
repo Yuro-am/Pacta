@@ -323,11 +323,14 @@ export default function Home() {
       try {
         const values = { p_title: title, p_owner_owes: direction === "owe", p_cents: Math.round(amount * 100) };
         if (split) {
-          const { data, error } = await client.rpc("pacta_split_group_debt", {
-            ...values, p_group: split.groupId, p_members: split.members,
-            p_include_self: split.includeSelf, p_split_id: split.id,
-          });
-          if (error?.code === "PGRST202") return "El reparto por grupos aún no está activado en Supabase.";
+          const batch = { p_title: title, p_owner_owes: values.p_owner_owes,
+            p_group: split.groupId, p_members: split.members, p_split_id: split.id };
+          const { data, error } = split.amounts
+            ? await client.rpc("pacta_split_group_debt_custom", { ...batch, p_amounts: split.amounts })
+            : await client.rpc("pacta_split_group_debt", { ...batch, p_cents: values.p_cents, p_include_self: split.includeSelf });
+          if (error?.code === "PGRST202") return split.amounts
+            ? "El reparto manual aún no está activado en Supabase."
+            : "El reparto por grupos aún no está activado en Supabase.";
           if (error?.message === "Group members changed") {
             void refreshSocial();
             return "Han cambiado los miembros del grupo. Revisa el reparto actualizado antes de guardarlo.";
