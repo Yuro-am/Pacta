@@ -117,3 +117,7 @@ Tras activar los audios, ejecuta [202611220012_group_chat.sql](supabase/migratio
 ### Fotos en el chat
 
 Tras activar el chat de grupo y las notas de voz, ejecuta [202611220013_chat_photos.sql](supabase/migrations/202611220013_chat_photos.sql). Pulsa **Adjuntar foto** en un chat privado o de grupo y revisa la vista previa antes de enviarla. Se admiten JPG, PNG, WebP y GIF de hasta 8 MB. Las descargas requieren acceso al chat.
+
+### Mensajes y solicitudes en tiempo real
+
+Ejecuta [202611220014_realtime_chat_and_requests.sql](supabase/migrations/202611220014_realtime_chat_and_requests.sql) después de activar el chat de grupo. Los chats abiertos, los mensajes privados de la campana y las solicitudes se actualizan al recibir un evento. Los tres puntos indican que alguien está escribiendo. La señal viaja por un canal privado y solo contiene el estado de escritura.

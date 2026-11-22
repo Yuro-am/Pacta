@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import type { ChatTarget } from "../lib/social";
 import type { createClient } from "../utils/supabase/client";
 
+import { useChatLive } from "./use-chat-live";
 import { ChatPhoto, PhotoComposer, photoBucket, type PhotoAttachment } from "./chat-photo";
 import { VoiceComposer, VoicePlayer, voiceBucket, type VoiceRecording } from "./voice-note";
 
@@ -30,14 +31,19 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
   const [loadError, setLoadError] = useState("");
   const [sendError, setSendError] = useState("");
   const inFlight = useRef(false);
+  const queuedRefresh = useRef(false);
   const revision = useRef(0);
   const pending = useRef<{ id: string; body: string } | null>(null);
   const history = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const lastRead = useRef<string | null>(null);
 
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    if (inFlight.current) return;
+  const refresh = useCallback(async (signal?: AbortSignal): Promise<void> => {
+    if (signal?.aborted) return;
+    if (inFlight.current) {
+      queuedRefresh.current = true;
+      return;
+    }
     inFlight.current = true;
     const startedAt = revision.current;
     try {
@@ -74,8 +80,16 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
     } finally {
       inFlight.current = false;
       if (!signal?.aborted) setLoading(false);
+      if (queuedRefresh.current) {
+        queuedRefresh.current = false;
+        if (!signal?.aborted && !document.hidden) void refresh(signal);
+      }
     }
   }, [client, isGroup, onChange, table, target.id, trackRead, userId]);
+
+  const { typing, reportTyping, stopTyping } = useChatLive(client, userId, target, () => {
+    if (!document.hidden) void refresh();
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,6 +130,7 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
     event.preventDefault();
     const body = draft.trim();
     if (!body || sending) return;
+    stopTyping();
     const id = pending.current?.body === body ? pending.current.id : crypto.randomUUID();
     pending.current = { id, body };
     setSending(true);
@@ -163,6 +178,7 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
     const next = draft.slice(0, start) + emoji + draft.slice(end);
     if (next.length > 1000) return;
     setDraft(next);
+    reportTyping(Boolean(next.trim()));
     setEmojiOpen(false);
     requestAnimationFrame(() => {
       field?.focus();
@@ -188,8 +204,15 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
         <time dateTime={message.created_at}>{messageTime.format(new Date(message.created_at))}</time>
       </div>)}
     </div>
+    <div className="chat-typing" role="status">
+      {typing && <><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span>
+        <span className="sr-only">{isGroup ? "Alguien está escribiendo" : `${target.name} está escribiendo`}</span></>}
+    </div>
     <form className="form" onSubmit={send}>
-      <label>Mensaje<textarea ref={textField} value={draft} onChange={(event) => setDraft(event.target.value)}
+      <label>Mensaje<textarea ref={textField} value={draft} onBlur={stopTyping} onChange={(event) => {
+        setDraft(event.target.value);
+        reportTyping(Boolean(event.target.value.trim()));
+      }}
         disabled={sending} rows={2} maxLength={1000} required placeholder={isGroup ? "Escribe al grupo…" : "Escribe a tu amigo…"} /></label>
       <div className="chat-tools">
         <button className="icon-button" type="button" disabled={sending} aria-label="Emojis" title="Emojis"

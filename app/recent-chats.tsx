@@ -25,9 +25,14 @@ export function RecentChats({ client, userId, friends, groups, refreshKey, openF
     const ids = groupIds.split(",");
     const controller = new AbortController();
     let loading = false;
+    let queued = false;
 
     async function refresh() {
-      if (controller.signal.aborted || loading || document.hidden) return;
+      if (controller.signal.aborted || document.hidden) return;
+      if (loading) {
+        queued = true;
+        return;
+      }
       loading = true;
       try {
         const results = await Promise.all(ids.map(async (id) => {
@@ -52,14 +57,24 @@ export function RecentChats({ client, userId, friends, groups, refreshKey, openF
         // Keep the visible previews during temporary network failures.
       } finally {
         loading = false;
+        if (queued) {
+          queued = false;
+          void refresh();
+        }
       }
     }
 
     void refresh();
+    const channel = client.channel(`pacta-group-recent-${crypto.randomUUID()}`);
+    for (const id of ids) channel.on("postgres_changes", {
+      schema: "public", table: "pacta_group_messages", event: "INSERT", filter: `group_id=eq.${id}`,
+    }, refresh);
+    channel.subscribe();
     const timer = window.setInterval(refresh, 12000);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       controller.abort();
+      void client.removeChannel(channel);
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refresh);
     };

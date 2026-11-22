@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
+import { watchUserActivity } from "../lib/social-realtime";
 import { watchSharedDebts } from "../lib/debt-realtime";
 import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/shared-debts";
 import type { DebtNotice } from "../lib/inbox";
@@ -248,16 +249,20 @@ export default function Home() {
   }, [client, userId]);
 
   useEffect(() => {
-    if (!userId) return;
-    void refreshSocial();
-    const timer = window.setInterval(() => {
-      if (!document.hidden) void refreshSocial();
-    }, 20000);
+    if (!client || !userId) return;
+    const requests = () => { if (!document.hidden) void refreshSocial(); };
+    const messages = () => { if (!document.hidden) void refreshInbox(); };
+    requests();
+    const stopWatching = watchUserActivity(client, userId, { messages, requests });
+    const timer = window.setInterval(requests, 20000);
+    document.addEventListener("visibilitychange", requests);
     return () => {
       socialRevision.current++;
+      stopWatching();
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", requests);
     };
-  }, [userId, refreshSocial]);
+  }, [client, userId, refreshInbox, refreshSocial]);
 
   async function runSocialAction(name: string, args: Record<string, string>) {
     if (!client || !userId || socialActionInProgress.current) return false;
