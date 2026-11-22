@@ -16,6 +16,7 @@ import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
 import { GroupBalances } from "./group-balances";
 import { GroupInvite, SocialPanel } from "./social";
+import { ShareAppButton, ShareAppDialog } from "./share-app";
 import { AppearancePicker, useAppearance } from "./appearance";
 import { NewDebtForm, type GroupSplit } from "./new-debt";
 import { ProfileDialog, useProfile } from "./profile";
@@ -51,7 +52,7 @@ export default function Home() {
   const [inviteError, setInviteError] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | "messages" | "access" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | "messages" | "access" | "shareApp" | null>(null);
   const checkedFirstAccess = useRef(false);
   const messageArea = useRef<HTMLDivElement>(null);
   const messageButton = useRef<HTMLButtonElement>(null);
@@ -498,6 +499,7 @@ export default function Home() {
         </nav>
         <div className="sidebar-bottom">
           <AppearancePicker {...appearance} />
+          <ShareAppButton className="help share-app-button" onClick={() => setDialog("shareApp")} />
           <button className="help" onClick={() => setDialog("welcome")}><CircleHelp size={19} /> Sobre Pacta</button>
           <button className="profile" onClick={() => setDialog("profile")} aria-label="Mi perfil"><span className="avatar">{initial}</span><span><strong>{profile.name}</strong><small>Mi espacio personal</small></span></button>
         </div>
@@ -621,8 +623,12 @@ export default function Home() {
               <button className="primary" onClick={() => setDialog("register")}>Crear cuenta</button>
             </div>)}
           {inviteError && <p role="alert" className="dialog-description">{inviteError}</p>}
-        </> : (dialog === "profile" || dialog === "register" || dialog === "access") ? <ProfileDialog
-          profile={profile} appearance={<AppearancePicker {...appearance} />} initialMode={dialog === "access" ? "access" : dialog === "register" ? "register" : invite ? "login" : "profile"} /> : dialog === "welcome" ? <div className="welcome">
+        </> : dialog === "shareApp" ? <ShareAppDialog />
+          : (dialog === "profile" || dialog === "register" || dialog === "access") ? <ProfileDialog
+          profile={profile} mobileSettings={<>
+            <AppearancePicker {...appearance} />
+            <ShareAppButton className="secondary share-app-button" onClick={() => setDialog("shareApp")} />
+          </>} initialMode={dialog === "access" ? "access" : dialog === "register" ? "register" : invite ? "login" : "profile"} /> : dialog === "welcome" ? <div className="welcome">
           <span className="brand-mark"><Handshake size={39} /></span>
           <h2 id="dialog-title">Bienvenido a PACTA<span className="brand-dot">.</span></h2>
           <p>Comparte gastos y salda cuentas a vuestra manera. Elegid entre dinero, comida, bebidas, favores y otras recompensas.</p>

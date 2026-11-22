@@ -62,10 +62,10 @@ function authErrorMessage(error: AuthError) {
 
 type ProfileMode = "profile" | "login" | "register" | "access";
 
-export function ProfileDialog({ profile, initialMode = "profile", appearance }: {
+export function ProfileDialog({ profile, initialMode = "profile", mobileSettings }: {
   profile: ReturnType<typeof useProfile>;
   initialMode?: ProfileMode;
-  appearance?: ReactNode;
+  mobileSettings?: ReactNode;
 }) {
   const { client, user, name, loading, saveDemoName } = profile;
   const [mode, setMode] = useState<ProfileMode>(initialMode);
@@ -296,7 +296,7 @@ export function ProfileDialog({ profile, initialMode = "profile", appearance }: 
           </> : <p>La creación de cuentas estará disponible cuando se configure Supabase.</p>}
       </div>
       {feedback && <p className="dialog-description" role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}
-      {showProfile && appearance && <div className="profile-appearance">{appearance}</div>}
+      {showProfile && mobileSettings && <div className="profile-appearance">{mobileSettings}</div>}
     </>}
   </>;
 }

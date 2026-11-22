@@ -39,8 +39,12 @@ export function describeSharedDebt(row: SharedDebtRow, userId: string): Debt {
   };
 }
 
+export function publicAppUrl(currentOrigin: string) {
+  return new URL("/", process.env.NEXT_PUBLIC_PACTA_URL || currentOrigin);
+}
+
 export function invitationUrl(token: string, currentOrigin: string) {
-  const url = new URL("/", process.env.NEXT_PUBLIC_PACTA_URL || currentOrigin);
+  const url = publicAppUrl(currentOrigin);
   url.searchParams.set("invite", token);
   return url;
 }
