@@ -4,6 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "PACTA · Entre amigos",
+  icons: { apple: "/app-icon/180" },
+  appleWebApp: { capable: true, title: "PACTA" },
   description: "Comparte gastos y salda deudas a vuestra manera.",
 };
 

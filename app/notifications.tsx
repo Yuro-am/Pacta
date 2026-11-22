@@ -1,12 +1,13 @@
 "use client";
 
 import { Bell, Check, ChevronRight, UserRoundPlus } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { euros, type Debt } from "../lib/demo";
 import type { Conversation, DebtNotice } from "../lib/inbox";
 import { DebtNoticeList, MessageList } from "./inbox";
 
 type Props = {
+  deviceSettings?: ReactNode;
   pending: number;
   requests: number;
   proposals: Debt[];
@@ -19,7 +20,7 @@ type Props = {
   markRead: (notices: DebtNotice[]) => Promise<void>;
 };
 
-export function Notifications({ pending, requests, proposals, messages, notices, openChat, openDebt, openProposal, openRequests, markRead }: Props) {
+export function Notifications({ deviceSettings, pending, requests, proposals, messages, notices, openChat, openDebt, openProposal, openRequests, markRead }: Props) {
   const [pendingOnly, setPendingOnly] = useState(pending > 0);
   const [marking, setMarking] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -42,6 +43,7 @@ export function Notifications({ pending, requests, proposals, messages, notices,
 
   return <>
     <h2 id="dialog-title">Notificaciones</h2>
+    {deviceSettings}
     <div className="filters notification-filters" aria-label="Filtrar notificaciones">
       <button aria-pressed={pendingOnly} className={pendingOnly ? "filter-active" : ""} onClick={() => setPendingOnly(true)}>
         Pendientes {pending > 0 && <span className="inbox-count">{pending > 99 ? "99+" : pending}</span>}

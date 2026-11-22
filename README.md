@@ -121,3 +121,28 @@ Tras activar el chat de grupo y las notas de voz, ejecuta [202611220013_chat_pho
 ### Mensajes y solicitudes en tiempo real
 
 Ejecuta [202611220014_realtime_chat_and_requests.sql](supabase/migrations/202611220014_realtime_chat_and_requests.sql) después de activar el chat de grupo. Los chats abiertos, los mensajes privados de la campana y las solicitudes se actualizan al recibir un evento. Los tres puntos indican que alguien está escribiendo. La señal viaja por un canal privado y solo contiene el estado de escritura.
+
+## Avisos del móvil
+
+PACTA puede mostrar notificaciones del sistema con la app cerrada cuando llegan mensajes privados o de grupo, movimientos de deudas, solicitudes de amistad e invitaciones de grupo. Los avisos de la pantalla bloqueada tienen texto genérico para mantener privados los mensajes y los importes.
+
+### Activación en producción
+
+1. En el proyecto local, ejecuta `npm ci` y `npx web-push generate-vapid-keys`. Genera también un secreto de webhook con `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+2. En **Vercel → Environment Variables**, añade estas variables para **Production** y vuelve a desplegar. Guarda las claves privadas y el secreto como **Secret**.
+
+   | Variable | Valor |
+   | --- | --- |
+   | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Clave pública del comando de VAPID, como **Config** |
+   | `VAPID_PRIVATE_KEY` | Clave privada del comando de VAPID |
+   | `VAPID_SUBJECT` | Correo de contacto del administrador con el prefijo `mailto:` |
+   | `PACTA_PUSH_WEBHOOK_SECRET` | Secreto aleatorio generado en el paso 1 |
+
+3. En **Supabase → Vault**, crea dos secretos. Guarda como `pacta_push_url` la URL pública completa `https://pacta-azure-nine.vercel.app/push/dispatch` y como `pacta_push_secret` el mismo secreto aleatorio que guardaste en Vercel. Para otro dominio, usa su URL pública con la ruta `/push/dispatch`.
+4. En **Supabase → SQL Editor → New query**, ejecuta [202611220016_mobile_push.sql](supabase/migrations/202611220016_mobile_push.sql) tras las migraciones anteriores.
+
+### Activar los avisos en cada móvil
+
+- **Android:** abre PACTA en Chrome, inicia sesión, abre la campana y pulsa **Activar avisos → Permitir**.
+- **iPhone o iPad (16.4 o posterior):** desde Safari, toca **Compartir → Añadir a pantalla de inicio**. Abre PACTA desde el icono y sigue los mismos pasos desde la campana.
+- Puedes desactivar los avisos del dispositivo desde la campana. Cerrar sesión también desactiva sus avisos.

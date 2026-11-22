@@ -1,5 +1,7 @@
 "use client";
 
+import { disableMobilePush } from "../lib/mobile-push";
+
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { isAuthError, isAuthRetryableFetchError, type AuthError, type User } from "@supabase/supabase-js";
 import { createClient } from "../utils/supabase/client";
@@ -231,6 +233,7 @@ export function ProfileDialog({ profile, initialMode = "profile", mobileSettings
     if (!client || busy) return;
     setBusy(true);
     try {
+      await disableMobilePush(client);
       const { error } = await client.auth.signOut({ scope: "local" });
       if (error) throw error;
       setMode("profile");

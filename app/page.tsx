@@ -14,6 +14,7 @@ import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/sh
 import type { DebtNotice } from "../lib/inbox";
 import type { ChatTarget, Person, SocialData, SocialGroup } from "../lib/social";
 import { MessageList } from "./inbox";
+import { MobilePush } from "./mobile-push";
 import { Notifications } from "./notifications";
 import { RecentChats } from "./recent-chats";
 import { useInbox } from "./use-inbox";
@@ -151,6 +152,13 @@ export default function Home() {
     } catch { /* An open invitation remains available in memory. */ }
 
     if (incoming || hasPendingInvitation) setDialog("invite");
+    else {
+      const notice = url.searchParams.get("aviso");
+      if (notice === "solicitudes") setView("Grupos");
+      if (notice === "notificaciones") setDialog("notifications");
+      if (notice === "mensajes") setDialog("messages");
+    }
+    url.searchParams.delete("aviso");
     const auth = url.searchParams.get("auth");
     if (auth === "confirmed" || auth === "failed") {
       setMessage(auth === "confirmed"
@@ -776,7 +784,7 @@ export default function Home() {
           <h2 id="dialog-title">Nueva deuda</h2><p className="dialog-description">Añade un gasto compartido o algo que quedó pendiente.</p>
           <NewDebtForm friends={friendsForDebt} onlineGroups={groupsForDebt} userId={userId}
             initialGroup={group} usingShared={usingShared} disabled={busy || profile.loading} save={addDebt} />
-        </> : dialog === "notifications" ? <Notifications pending={unread} requests={pendingSocial} proposals={proposals}
+        </> : dialog === "notifications" ? <Notifications deviceSettings={client && userId ? <MobilePush key={userId} client={client} userId={userId} /> : undefined} pending={unread} requests={pendingSocial} proposals={proposals}
           messages={inbox?.conversations.filter((item) => item.unread_count > 0) ?? []} notices={notices}
           openChat={openChat} openDebt={openDebtNotice} openProposal={openProposal} markRead={markDebtNotices}
           openRequests={() => { setDialog(null); navigate("Grupos"); }} /> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={(debt) => confirmTrash(debt, "trash")} busy={busy} shareInvitation={shareInvitation} />}
