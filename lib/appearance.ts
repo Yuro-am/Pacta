@@ -1,11 +1,13 @@
 export const themeKey = "pacta-theme";
 export const accentKey = "pacta-accent";
 export const accents = [
-  { id: "purple", label: "Morado" },
+  { id: "red", label: "Rojo" },
   { id: "blue", label: "Azul" },
   { id: "green", label: "Verde" },
-  { id: "rose", label: "Rosa" },
-  { id: "amber", label: "Naranja" },
+  { id: "yellow", label: "Amarillo" },
 ] as const;
 
 export type Accent = typeof accents[number]["id"];
+
+export const defaultAccent: Accent = "blue";
+export const previousAccents: Record<string, Accent> = { purple: "blue", rose: "red", amber: "yellow" };

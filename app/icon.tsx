@@ -13,7 +13,7 @@ export default function Icon() {
       alignItems: "center",
       justifyContent: "center",
       borderRadius: 19,
-      background: "#6c46d9",
+      background: "#245db3",
       color: "#fff",
     }}>
       <CircleDollarSign size={43} strokeWidth={2.3} color="#fff" />

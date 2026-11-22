@@ -3,13 +3,13 @@
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { accentKey, accents, themeKey, type Accent } from "../lib/appearance";
+import { accentKey, accents, defaultAccent, themeKey, type Accent } from "../lib/appearance";
 
 type Theme = "light" | "dark";
 
 export function useAppearance() {
   const [theme, setTheme] = useState<Theme>("light");
-  const [accent, setAccent] = useState<Accent>("purple");
+  const [accent, setAccent] = useState<Accent>(defaultAccent);
 
   useEffect(() => {
     const preferences = document.documentElement.dataset;
