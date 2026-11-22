@@ -9,7 +9,10 @@ import {
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
 import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/shared-debts";
+import type { DebtNotice } from "../lib/inbox";
 import type { Person, SocialData } from "../lib/social";
+import { DebtNoticeList, MessageList } from "./inbox";
+import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
 import { GroupInvite, SocialPanel } from "./social";
 import { ProfileDialog, useProfile } from "./profile";
@@ -44,7 +47,7 @@ export default function Home() {
   const [inviteError, setInviteError] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | "messages" | null>(null);
   const [chatFriend, setChatFriend] = useState<Person | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [group, setGroup] = useState<string | null>(null);
@@ -53,6 +56,7 @@ export default function Home() {
   const profile = useProfile();
   const { client } = profile;
   const userId = profile.user?.id;
+  const { inbox, refresh: refreshInbox } = useInbox(client, userId);
   useEffect(() => { setChatFriend(null); }, [userId]);
   const sharedUnavailable = sharedError?.actor === userId && sharedError?.missing;
   const usingShared = Boolean(userId && !sharedUnavailable);
@@ -65,9 +69,11 @@ export default function Home() {
   const firstName = profile.name.split(/\s+/, 1)[0];
   const initial = Array.from(profile.name)[0]?.toLocaleUpperCase("es");
   const active = debts.find((debt) => debt.id === selected);
-  const pendingSocial = (social?.friends.some((friend) => friend.incoming && !friend.accepted) ?? false)
-    || (social?.groups.some((item) => !item.accepted) ?? false);
-  const proposals = debts.filter((debt) => debt.stage === "Propuesta" && (!debt.shared || debt.shared.canRespond));
+  const pendingSocial = (social?.friends.filter((friend) => friend.incoming && !friend.accepted).length ?? 0)
+    + (social?.groups.filter((item) => !item.accepted).length ?? 0);
+  const proposals = debts.filter((debt) => debt.stage === "Propuesta" && (!debt.shared || debt.shared.canRespond)
+    && !inbox?.notices.some((notice) => notice.kind === "proposal" && notice.debt_id === debt.id));
+  const unread = (inbox?.unread_messages ?? 0) + (inbox?.unread_debts ?? 0) + proposals.length + pendingSocial;
   const owed = debts.reduce((sum, debt) => sum + (debt.stage !== "Saldada" && debt.direction === "owed" ? Math.round(debt.amount * 100) : 0), 0) / 100;
   const owe = debts.reduce((sum, debt) => sum + (debt.stage !== "Saldada" && debt.direction === "owe" ? Math.round(debt.amount * 100) : 0), 0) / 100;
 
@@ -191,6 +197,37 @@ export default function Home() {
       return false;
     } finally {
       socialActionInProgress.current = false;
+    }
+  }
+
+  function openChat(friend: Person) {
+    setDialog(null);
+    setSelected(null);
+    setChatFriend(friend);
+  }
+
+  async function openDebtNotice(notice: DebtNotice) {
+    if (!client || !userId || busy) return;
+    let debt = debts.find((item) => item.id === notice.debt_id);
+    if (!debt) {
+      setBusy(true);
+      try {
+        const { data, error } = await client.from("shared_debts").select("*").eq("id", notice.debt_id).single();
+        if (error || !data) {
+          setMessage("No se pudo abrir esa deuda. Inténtalo de nuevo.");
+          return;
+        }
+        debt = describeSharedDebt(data, userId);
+        storeSharedDebt(data, userId);
+      } finally {
+        setBusy(false);
+      }
+    }
+    setDialog(null);
+    setSelected(debt.id);
+    if (notice.unread) {
+      await client.rpc("pacta_read_debt_notice", { p_notice: notice.id });
+      void refreshInbox();
     }
   }
 
@@ -415,7 +452,9 @@ export default function Home() {
           <button className="brand mobile-brand" onClick={() => setDialog("welcome")} aria-label="Bienvenida a Pacta"><span className="brand-mark"><Handshake size={21} /></span> pacta<span className="brand-dot">.</span></button>
           <span className="top-label">Mi espacio</span>
           <div className="top-actions">
-            <button className="icon-button notification" aria-label="Notificaciones" onClick={() => setDialog("notifications")}><Bell size={19} />{(proposals.length > 0 || pendingSocial) && <i />}</button>
+            <button className="icon-button notification" aria-label={unread ? `Notificaciones (${unread} sin leer)` : "Notificaciones"} onClick={() => {
+              setDialog("notifications"); void refreshInbox();
+            }}><Bell size={19} />{unread > 0 && <span className="notification-count">{unread > 99 ? "99+" : unread}</span>}</button>
             <button className="avatar top-avatar" onClick={() => setDialog("profile")} aria-label="Mi perfil">{initial}</button>
           </div>
         </header>
@@ -446,6 +485,13 @@ export default function Home() {
               <button onClick={() => { const pending = debts.find((debt) => debt.stage !== "Saldada"); if (pending) setSelected(pending.id); else setDialog("welcome"); }}>Cómo funciona <ArrowRight size={16} /></button>
             </section>
 
+            {userId && <section className="home-messages">
+              <div className="section-heading"><h2>Mensajes{Boolean(inbox?.unread_messages) && <span className="inbox-count">{inbox?.unread_messages}</span>}</h2>
+                <button onClick={() => { setDialog("messages"); void refreshInbox(); }}>Ver mensajes <ArrowRight size={15} /></button>
+              </div>
+              {inbox ? <MessageList conversations={inbox.conversations.slice(0, 3)} onOpen={openChat} />
+                : <div className="debt-list"><p className="empty">Abre un chat desde Grupos → Mis amigos.</p></div>}
+            </section>}
             <div className="dashboard-grid">
               <section>
                 <div className="section-heading"><h2>Actividad reciente</h2><button onClick={() => navigate("Actividad")}>Ver todo <ArrowRight size={15} /></button></div>
@@ -469,7 +515,7 @@ export default function Home() {
               )}</div>
               <div className="section-heading"><h2>Movimientos del grupo</h2></div>
               {debtList(visibleDebts)}
-            </> : userId ? (social ? <SocialPanel data={social} userId={userId} run={runSocialAction} openGroup={showGroup} openChat={setChatFriend} />
+            </> : userId ? (social ? <SocialPanel data={social} userId={userId} run={runSocialAction} openGroup={showGroup} openChat={openChat} />
               : <p role="status">{socialUnavailableFor === userId ? "Amigos y grupos aún no están disponibles. Comprueba la configuración de Supabase." : "Cargando amigos y grupos…"}</p>)
               : <><button className="secondary invitation-button" onClick={() => setDialog("profile")}>Inicia sesión para añadir amigos y grupos</button>
                 <div className="groups-page">{groupList()}</div></>}
@@ -494,7 +540,7 @@ export default function Home() {
       {(dialog || active || (chatFriend && client && userId)) && <Modal close={() => {
         setDialog(null); setSelected(null); setChatFriend(null);
       }}>
-        {chatFriend && client && userId ? <ChatDialog key={`${userId}:${chatFriend.id}`} client={client} userId={userId} friend={chatFriend} />
+        {chatFriend && client && userId ? <ChatDialog key={`${userId}:${chatFriend.id}`} client={client} userId={userId} friend={chatFriend} trackRead={Boolean(inbox)} onChange={refreshInbox} />
           : dialog === "invite" ? <>
           <h2 id="dialog-title">Invitación de PACTA</h2>
           <p className="dialog-description">{!invite ? "Este enlace no es válido." : !client
@@ -530,16 +576,33 @@ export default function Home() {
             {!usingShared && <label>Grupo<select name="group" defaultValue={group || ""}><option value="">Sin grupo</option>{groups.map((item) => <option key={item.name}>{item.name}</option>)}</select></label>}
             <button className="primary form-submit" type="submit" disabled={busy || profile.loading || Boolean(realGroup && !friendsForDebt.length)}><Plus size={18} /> Registrar deuda</button>
           </form>
+        </> : dialog === "messages" ? <>
+          <h2 id="dialog-title">Mensajes</h2>
+          <p className="dialog-description">Tus conversaciones recientes.</p>
+          <button className="secondary invitation-button" onClick={() => {
+            setDialog(null); navigate("Grupos");
+          }}>Nuevo mensaje</button>
+          <MessageList conversations={inbox?.conversations ?? []} onOpen={openChat} />
         </> : dialog === "notifications" ? <>
-          <h2 id="dialog-title">Notificaciones</h2><p className="dialog-description">Propuestas que esperan respuesta.</p>
-          {pendingSocial && <button className="secondary invitation-button" onClick={() => {
+          <h2 id="dialog-title">Notificaciones</h2>
+          <p className="dialog-description">Mensajes, solicitudes y cambios en tus deudas.</p>
+          {Boolean(inbox?.conversations.some((item) => item.unread_count > 0)) && <section className="notification-section">
+            <h3>Mensajes nuevos</h3>
+            <MessageList conversations={inbox!.conversations.filter((item) => item.unread_count > 0)} onOpen={openChat} />
+          </section>}
+          {Boolean(inbox?.notices.length) && <section className="notification-section">
+            <h3>Deudas</h3>
+            <DebtNoticeList notices={inbox!.notices} onOpen={openDebtNotice} />
+          </section>}
+          {pendingSocial > 0 && <button className="secondary invitation-button" onClick={() => {
             setDialog(null);
             navigate("Grupos");
           }}>Ver solicitudes de amigos y grupos</button>}
-          <div className="debt-list">{proposals.length ? proposals.map((debt) =>
+          {proposals.length > 0 && <div className="debt-list">{proposals.map((debt) =>
             <button className="debt-row" key={debt.id} onClick={() => { setDialog(null); setSelected(debt.id); }}>
               <span className="tile lilac"><Bell size={19} /></span><span className="row-copy"><strong>{debt.title}</strong><small>{debt.friend} · {debt.offer?.method}</small></span><ChevronRight size={16} />
-            </button>) : <p className="empty">No tienes propuestas pendientes.</p>}</div>
+            </button>)}</div>}
+          {!unread && !inbox?.notices.length && <p className="empty">Estás al día. Los avisos aparecerán aquí.</p>}
         </> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={deleteDebt} busy={busy} shareInvitation={shareInvitation} />}
       </Modal>}
       <div role="status" className={message ? "toast shown" : "toast"}>{message && <><Check size={17} />{message}</>}</div>

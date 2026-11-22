@@ -9,10 +9,12 @@ type Message = { id: string; sender_id: string; body: string; created_at: string
 const messageFields = "id,sender_id,body,created_at";
 const messageTime = new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" });
 
-export function ChatDialog({ client, userId, friend }: {
+export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
   client: NonNullable<ReturnType<typeof createClient>>;
   userId: string;
   friend: Person;
+  trackRead: boolean;
+  onChange: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -25,6 +27,7 @@ export function ChatDialog({ client, userId, friend }: {
   const pending = useRef<{ id: string; body: string } | null>(null);
   const history = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const lastRead = useRef<string | null>(null);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     if (inFlight.current) return;
@@ -42,11 +45,21 @@ export function ChatDialog({ client, userId, friend }: {
           : "No se pudo cargar el chat. Vuelve a intentarlo.");
       } else {
         setLoadError("");
+        const latestIncoming = data?.find((item) => item.sender_id === friend.id);
         setMessages((previous) => {
           const recent = (data ?? []).reverse();
           return recent.length === previous.length && recent.every((item, index) => item.id === previous[index].id)
             ? previous : recent;
         });
+        if (trackRead && latestIncoming && !document.hidden && latestIncoming.id !== lastRead.current) {
+          const id = latestIncoming.id;
+          lastRead.current = id;
+          void (async () => {
+            const { error } = await client.rpc("pacta_read_chat", { p_message: id });
+            if (!error) onChange();
+            else if (lastRead.current === id) lastRead.current = null;
+          })();
+        }
       }
     } catch {
       if (!signal?.aborted) setLoadError("No se pudo cargar el chat. Vuelve a intentarlo.");
@@ -54,7 +67,7 @@ export function ChatDialog({ client, userId, friend }: {
       inFlight.current = false;
       if (!signal?.aborted) setLoading(false);
     }
-  }, [client, friend.id, userId]);
+  }, [client, friend.id, onChange, trackRead, userId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -96,6 +109,7 @@ export function ChatDialog({ client, userId, friend }: {
       if (data) setMessages((previous) => [...previous.filter((item) => item.id !== data.id), data].slice(-50));
       if (history.current) history.current.scrollTop = history.current.scrollHeight;
       setDraft("");
+      onChange();
       void refresh();
     } catch {
       setSendError("No se pudo enviar. El mensaje sigue en el cuadro de texto para que puedas reintentarlo.");
