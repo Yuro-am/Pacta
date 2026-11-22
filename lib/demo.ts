@@ -11,7 +11,8 @@ export type Debt = {
   kind: "food" | "trip" | "drink" | "other";
   date: string;
   stage: Stage;
-  shared?: { waiting: boolean; invite?: string; canRespond: boolean };
+  trashedAt?: string;
+  shared?: { waiting: boolean; invite?: string; canRespond: boolean; owned: boolean };
   offer?: { method: Method; detail: string };
 };
 

@@ -4,6 +4,7 @@ export type SharedDebtRow = {
   id: string;
   invite_token: string;
   created_at: string;
+  trashed_at?: string | null;
   owner_id: string;
   guest_id: string | null;
   group_id?: string | null;
@@ -31,7 +32,9 @@ export function describeSharedDebt(row: SharedDebtRow, userId: string): Debt {
     group: row.group_id ?? "",
     kind: "other",
     offer: row.method && row.detail ? { method: row.method, detail: row.detail } : undefined,
+    trashedAt: row.trashed_at ?? undefined,
     shared: {
+      owned: isOwner,
       waiting: !row.guest_id,
       invite: isOwner && !row.guest_id ? row.invite_token : undefined,
       canRespond: row.proposer_id !== userId,

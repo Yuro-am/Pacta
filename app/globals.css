@@ -362,3 +362,12 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 780; letter-spacing: -.05
 .typing-dots i:nth-child(3) { animation-delay: 260ms; }
 @keyframes typing-dot { 0%, 60%, 100% { transform: none; opacity: .58; } 30% { transform: translateY(-3px); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .typing-dots i { animation: none; } }
+
+.debt-row.can-trash { touch-action: pan-y pinch-zoom; user-select: none; -webkit-touch-callout: none; }
+.trash-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; }
+.trash-row + .trash-row { border-top: 1px solid var(--line); }
+.trash-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.trash-hint { display: none; }
+@media (pointer: coarse) {
+  .trash-hint { display: block; margin: 0 0 10px; font-size: .875rem; }
+}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight,
   CircleDollarSign, CircleHelp, Coffee, Gift, HandHeart, House, LayoutGrid, List, Pizza,
-  Plane, Plus, ReceiptText, Send, Sparkles, MessageCircle, UsersRound, Wallet, X,
+  Plane, Plus, ReceiptText, Send, Sparkles, MessageCircle, UsersRound, Wallet, X, Trash2,
 } from "lucide-react";
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
@@ -18,6 +18,7 @@ import { Notifications } from "./notifications";
 import { RecentChats } from "./recent-chats";
 import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
+import { DebtGesture } from "./debt-gesture";
 import { GroupBalances } from "./group-balances";
 import { GroupInvite, SocialPanel } from "./social";
 import { ShareAppButton, ShareAppDialog } from "./share-app";
@@ -42,6 +43,12 @@ const kindColors = { food: "peach", trip: "lilac", drink: "mint", other: "sand" 
 const firstAccessKey = "pacta-first-access-v1";
 const avatars = ["#e8dcff", "#ffdfcf", "#dcf2e7", "#ffdced"];
 
+type TrashAction = "trash" | "restore" | "purge";
+
+function canTrash(debt: Debt) {
+  return !debt.shared || (debt.shared.owned && ["Pendiente", "Propuesta"].includes(debt.stage));
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("Inicio");
   const [localDebts, setLocalDebts] = useState<Debt[]>([]);
@@ -62,8 +69,11 @@ export default function Home() {
   const messageButton = useRef<HTMLButtonElement>(null);
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [trashPrompt, setTrashPrompt] = useState<{ id: string; action: "trash" | "purge" } | null>(null);
+  const [trashError, setTrashError] = useState("");
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState<"Todo" | "Pendientes" | "Saldadas">("Todo");
+  const [showTrash, setShowTrash] = useState(false);
   const [message, setMessage] = useState("");
   const profile = useProfile();
   const appearance = useAppearance();
@@ -98,7 +108,10 @@ export default function Home() {
   const groupName = realGroup?.name ?? (!userId ? groups.find((item) => item.name === group)?.name : undefined);
   const friendsForDebt = social?.friends.filter((friend) => friend.accepted) ?? [];
   const groupsForDebt = social?.groups.filter((item) => item.accepted) ?? [];
-  const debts = usingShared ? (shared?.actor === userId ? shared?.debts ?? [] : []) : localDebts;
+  const allDebts = usingShared ? (shared?.actor === userId ? shared?.debts ?? [] : []) : localDebts;
+  const debts = allDebts.filter((debt) => !debt.trashedAt);
+  const trash = allDebts.filter((debt) => debt.trashedAt && canTrash(debt));
+  const trashDebt = allDebts.find((debt) => debt.id === trashPrompt?.id && canTrash(debt));
   const firstName = profile.name.split(/\s+/, 1)[0];
   const initial = Array.from(profile.name)[0]?.toLocaleUpperCase("es");
   const active = debts.find((debt) => debt.id === selected);
@@ -304,7 +317,7 @@ export default function Home() {
       setBusy(true);
       try {
         const { data, error } = await client.from("shared_debts").select("*").eq("id", notice.debt_id).single();
-        if (error || !data) {
+        if (error || !data || data.trashed_at) {
           setMessage("No se pudo abrir esa deuda. Inténtalo de nuevo.");
           return;
         }
@@ -474,33 +487,47 @@ export default function Home() {
     setMessage(notice);
   }
 
-  async function deleteDebt(debt: Debt) {
-    if (busy) return "Otra operación está en curso. Vuelve a intentarlo.";
+  function confirmTrash(debt: Debt, action: "trash" | "purge") {
+    setTrashError("");
+    setTrashPrompt({ id: debt.id, action });
+  }
 
-    if (debt.shared) {
-      if (!userId || !client || !debt.shared.invite) return "Esta deuda ya está compartida.";
-      setBusy(true);
-      try {
-        const { data, error } = await client.from("shared_debts").delete()
-          .eq("id", debt.id).select("id").maybeSingle();
-        if (error?.code === "42501") return "El borrado de invitaciones aún no está activado en Supabase.";
-        if (error) return "No se pudo borrar la deuda. Inténtalo de nuevo.";
-        if (!data) return "No se pudo borrar. La deuda puede estar ya compartida o borrada.";
-        sharedRevision.current++;
-        setShared((previous) => previous?.actor === userId
-          ? { actor: userId, debts: previous.debts.filter((item) => item.id !== debt.id) }
-          : previous);
-      } catch {
-        return "No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.";
-      } finally {
-        setBusy(false);
+  async function changeTrash(debt: Debt, action: TrashAction) {
+    if (busy || !canTrash(debt)) return;
+    setTrashError("");
+    setBusy(true);
+    try {
+      if (debt.shared) {
+        if (!userId || !client) return;
+        const { data, error } = await client.rpc("pacta_debt_trash", { p_id: debt.id, p_action: action });
+        if (error?.code === "PGRST202") {
+          setTrashError("La papelera de deudas compartidas aún necesita activarse en Supabase.");
+          return;
+        }
+        if (error || !data) throw error;
+        if (action === "purge") {
+          sharedRevision.current++;
+          setShared((previous) => previous?.actor === userId
+            ? { actor: userId, debts: previous.debts.filter((item) => item.id !== debt.id) }
+            : previous);
+        } else {
+          storeSharedDebt(data, userId);
+        }
+        void refreshInbox();
+      } else {
+        const trashedAt = action === "trash" ? new Date().toISOString() : undefined;
+        setLocalDebts((previous) => action === "purge"
+          ? previous.filter((item) => item.id !== debt.id)
+          : previous.map((item) => item.id === debt.id ? { ...item, trashedAt } : item));
       }
-    } else {
-      setLocalDebts((previous) => previous.filter((item) => item.id !== debt.id));
+      setSelected(null);
+      setTrashPrompt(null);
+      setMessage(action === "trash" ? "Deuda movida a la papelera" : action === "restore" ? "Deuda restaurada" : "Deuda borrada definitivamente");
+    } catch {
+      setTrashError("No se pudo completar la operación. Comprueba si la deuda ha cambiado e inténtalo de nuevo.");
+    } finally {
+      setBusy(false);
     }
-
-    setSelected((current) => current === debt.id ? null : current);
-    setMessage("Deuda borrada");
   }
 
   function showGroup(name: string) {
@@ -517,7 +544,8 @@ export default function Home() {
     return <div className="debt-list">
       {items.length ? items.map((debt) => {
         const Icon = kindIcons[debt.kind];
-        return <button key={debt.id} className="debt-row" onClick={() => setSelected(debt.id)}>
+        return <DebtGesture key={debt.id} open={() => setSelected(debt.id)}
+          trash={canTrash(debt) ? () => confirmTrash(debt, "trash") : undefined}>
           <span className={`tile ${kindColors[debt.kind]}`}><Icon size={20} /></span>
           <span className="row-copy"><strong>{debt.title}</strong><small>{debt.friend} · {(debt.shared ? social?.groups.find((item) => item.id === debt.group)?.name : debt.group) || "Sin grupo"}</small></span>
           <span className="row-value">
@@ -527,7 +555,7 @@ export default function Home() {
             <small>{debt.stage === "Pendiente" ? debt.date : debt.stage}</small>
           </span>
           <ChevronRight className="row-chevron" size={16} />
-        </button>;
+        </DebtGesture>;
       }) : <p className="empty">Aquí aparecerán los movimientos.</p>}
     </div>;
   }
@@ -668,10 +696,29 @@ export default function Home() {
           </> : <>
             <div className="page-heading"><div><h1>Actividad</h1><p>Consulta tus deudas, propuestas y pagos.</p></div>
             <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
+            <button className="secondary invitation-button" aria-expanded={showTrash}
+              onClick={() => { setTrashError(""); setShowTrash(!showTrash); }}>
+              <Trash2 size={17} /> {showTrash ? "Volver a actividad" : `Papelera${trash.length ? ` (${trash.length})` : ""}`}
+            </button>
+            {showTrash ? <section aria-label="Papelera de deudas">
+              <div className="section-heading"><h2>Papelera</h2></div>
+              {!trashPrompt && trashError && <p role="alert">{trashError}</p>}
+              <div className="debt-list">{trash.length ? trash.map((debt) =>
+                <div key={debt.id} className="trash-row">
+                  <div className="row-copy"><strong>{debt.title}</strong><small>{debt.friend} · {euros(debt.amount)}</small></div>
+                  <div className="trash-actions">
+                    <button className="secondary" disabled={busy} onClick={() => void changeTrash(debt, "restore")}>Restaurar</button>
+                    <button className="danger" disabled={busy} onClick={() => confirmTrash(debt, "purge")}>Borrar definitivamente</button>
+                  </div>
+                </div>
+              ) : <p className="empty">La papelera está vacía.</p>}</div>
+            </section> : <>
             <div className="filters" aria-label="Filtrar actividad">{(["Todo", "Pendientes", "Saldadas"] as const).map((item) =>
               <button key={item} aria-pressed={filter === item} className={filter === item ? "filter-active" : ""} onClick={() => setFilter(item)}>{item}</button>
             )}</div>
+            {visibleDebts.some(canTrash) && <p className="trash-hint">Mantén pulsada una deuda o deslízala hacia un lado para moverla a la papelera.</p>}
             {debtList(visibleDebts)}
+            </>}
           </>}
           </div>
         </div>
@@ -684,10 +731,24 @@ export default function Home() {
         <button onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
 
-      {((dialog && dialog !== "messages") || active || (chatTarget && client && userId)) && <Modal close={() => {
-        setDialog(null); setSelected(null); setChatTarget(null);
+      {((dialog && dialog !== "messages") || active || trashDebt || (chatTarget && client && userId)) && <Modal close={() => {
+        setDialog(null); setSelected(null); setChatTarget(null); setTrashPrompt(null); setTrashError("");
       }}>
-        {chatTarget && client && userId ? <ChatDialog key={`${userId}:${chatTarget.kind}:${chatTarget.id}`} client={client} userId={userId} target={chatTarget} trackRead={Boolean(inbox)} onChange={chatTarget.kind === "group" ? refreshGroupChats : refreshInbox} />
+        {trashPrompt && trashDebt ? <>
+          <h2 id="dialog-title">{trashPrompt.action === "purge" ? "¿Borrar definitivamente?" : "¿Mover a la papelera?"}</h2>
+          <p className="dialog-description">{trashPrompt.action === "purge"
+            ? `«${trashDebt.title}» se borrará para siempre.`
+            : `«${trashDebt.title}» saldrá de la actividad y del saldo. Podrás restaurarla desde la papelera.`}
+            {trashPrompt.action === "trash" && trashDebt.shared && " Si la compartiste, se retirará también para tu amigo."}
+          </p>
+          {trashError && <p className="dialog-description" role="alert">{trashError}</p>}
+          <div className="dialog-actions">
+            <button className="secondary" disabled={busy} onClick={() => { setTrashPrompt(null); setTrashError(""); }}>Cancelar</button>
+            <button className="danger" disabled={busy} onClick={() => void changeTrash(trashDebt, trashPrompt.action)}>
+              {trashPrompt.action === "purge" ? "Borrar definitivamente" : "Mover a la papelera"}
+            </button>
+          </div>
+        </> : chatTarget && client && userId ? <ChatDialog key={`${userId}:${chatTarget.kind}:${chatTarget.id}`} client={client} userId={userId} target={chatTarget} trackRead={Boolean(inbox)} onChange={chatTarget.kind === "group" ? refreshGroupChats : refreshInbox} />
           : dialog === "invite" ? <>
           <h2 id="dialog-title">Invitación de PACTA</h2>
           <p className="dialog-description">{!invite ? "Este enlace no es válido." : !client
@@ -718,7 +779,7 @@ export default function Home() {
         </> : dialog === "notifications" ? <Notifications pending={unread} requests={pendingSocial} proposals={proposals}
           messages={inbox?.conversations.filter((item) => item.unread_count > 0) ?? []} notices={notices}
           openChat={openChat} openDebt={openDebtNotice} openProposal={openProposal} markRead={markDebtNotices}
-          openRequests={() => { setDialog(null); navigate("Grupos"); }} /> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={deleteDebt} busy={busy} shareInvitation={shareInvitation} />}
+          openRequests={() => { setDialog(null); navigate("Grupos"); }} /> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={(debt) => confirmTrash(debt, "trash")} busy={busy} shareInvitation={shareInvitation} />}
       </Modal>}
       <div role="status" className={message ? "toast shown" : "toast"}>{message && <><Check size={17} />{message}</>}</div>
     </div>
@@ -748,32 +809,16 @@ function Modal({ children, close }: { children: React.ReactNode; close: () => vo
 function DebtDetail({ debt, update, remove, busy, shareInvitation }: {
   debt: Debt;
   update: (value: Partial<Debt>, notice: string) => void;
-  remove: (debt: Debt) => Promise<string | undefined>;
+  remove: (debt: Debt) => void;
   busy: boolean;
   shareInvitation: (token: string) => void;
 }) {
   const [method, setMethod] = useState<Method>("Dinero");
   const [confirming, setConfirming] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const stages = ["Propuesta", "Aceptada", "Saldada"];
   const progress = stages.indexOf(debt.stage);
   const inviteToken = debt.shared?.invite;
   const inviteUrl = inviteToken ? invitationUrl(inviteToken, window.location.origin).href : "";
-  if (confirmingDelete) return <>
-    <h2 id="dialog-title">¿Borrar deuda?</h2>
-    <p className="dialog-description">Se eliminará «{debt.title}» de tu actividad y de tu saldo.
-      {debt.shared && " El enlace de invitación dejará de funcionar."}
-    </p>
-    {deleteError && <p className="dialog-description" role="alert">{deleteError}</p>}
-    <div className="dialog-actions">
-      <button className="secondary" disabled={busy} onClick={() => { setConfirmingDelete(false); setDeleteError(""); }}>Cancelar</button>
-      <button className="danger" disabled={busy} onClick={async () => {
-        setDeleteError((await remove(debt)) ?? "");
-      }}>{busy ? "Borrando…" : "Sí, borrar deuda"}</button>
-    </div>
-  </>;
-
   return <>
     <h2 id="dialog-title">{debt.title}</h2>
     <p className="dialog-description">{debt.direction === "owe" ? `Le debes a ${debt.friend}` : `${debt.friend} te debe`} <strong>{euros(debt.amount)}</strong></p>
@@ -817,8 +862,8 @@ function DebtDetail({ debt, update, remove, busy, shareInvitation }: {
       </>)}
       {debt.stage === "Saldada" && <p className="settled"><Check size={18} /> Deuda saldada</p>}
     </>}
-    {(!debt.shared || inviteToken) && <div className="dialog-actions debt-delete-actions">
-      <button className="danger" disabled={busy} onClick={() => setConfirmingDelete(true)}>Borrar deuda</button>
+    {canTrash(debt) && <div className="dialog-actions debt-delete-actions">
+      <button className="danger" disabled={busy} onClick={() => remove(debt)}>Mover a la papelera</button>
     </div>}
   </>;
 }

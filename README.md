@@ -64,11 +64,11 @@ Los dos participantes ven la deuda en **Actividad**. Quien recibe una propuesta 
 
 PACTA empieza con el saldo a cero para quienes aún no registraron deudas. Los movimientos de ejemplo de versiones anteriores se retiran automáticamente y se conservan los movimientos que creaste manualmente sin iniciar sesión. Estos últimos siguen siendo locales y aparecen al usar la app sin una cuenta. Los grupos de ejemplo también siguen siendo locales.
 
-## Borrar una deuda
+## Papelera de deudas
 
-Abre la deuda en **Actividad**, pulsa **Borrar deuda** y confirma. Se pueden borrar las deudas locales y las invitaciones aún sin aceptar. Cuando un amigo ya aceptó, la deuda queda visible para ambas cuentas.
+En móvil, mantén pulsada una deuda o deslízala hacia un lado para abrir la confirmación. También puedes abrir su detalle y pulsar **Mover a la papelera**. En **Actividad → Papelera** puedes restaurar una deuda o confirmar su borrado definitivo.
 
-En Supabase, ejecuta [202611220002_delete_unclaimed_debts.sql](supabase/migrations/202611220002_delete_unclaimed_debts.sql) después de la migración inicial para habilitar el borrado de invitaciones pendientes.
+Puedes retirar las deudas compartidas que creaste mientras estén pendientes o en propuesta. Al retirarlas salen de la actividad y de los saldos de ambas partes. Para activar la papelera de deudas compartidas, abre **SQL Editor → New query** en Supabase, pega el contenido completo de [202611220015_debt_trash.sql](supabase/migrations/202611220015_debt_trash.sql) y pulsa **Run**.
 
 ## Añadir amigos y crear grupos
 
