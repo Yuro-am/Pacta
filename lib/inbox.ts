@@ -1,6 +1,7 @@
 import type { Person } from "./social";
 
 export type Conversation = Person & {
+  kind?: "group";
   body: string;
   created_at: string;
   mine: boolean;

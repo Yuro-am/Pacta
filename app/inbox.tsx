@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, MessageCircle, ReceiptText } from "lucide-react";
+import { ChevronRight, MessageCircle, ReceiptText, UsersRound } from "lucide-react";
 import type { Conversation, DebtNotice } from "../lib/inbox";
 
 const clock = new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -24,8 +24,8 @@ export function MessageList({ conversations, onOpen }: {
   onOpen: (conversation: Conversation) => void;
 }) {
   return <div className="debt-list">{conversations.length ? conversations.map((item) =>
-    <button key={item.id} className={`debt-row inbox-row${item.unread_count ? " inbox-unread" : ""}`} onClick={() => onOpen(item)}>
-      <span className="tile lilac"><MessageCircle size={19} /></span>
+    <button key={`${item.kind ?? "friend"}:${item.id}`} className={`debt-row inbox-row${item.unread_count ? " inbox-unread" : ""}`} onClick={() => onOpen(item)}>
+      <span className="tile lilac">{item.kind === "group" ? <UsersRound size={19} /> : <MessageCircle size={19} />}</span>
       <span className="row-copy"><strong>{item.name}</strong><small>{item.mine && "Tú: "}{item.body}</small></span>
       <span className="inbox-meta"><time dateTime={item.created_at}>{timestamp(item.created_at)}</time>
         {item.unread_count > 0 && <span className="inbox-count" aria-label={`${item.unread_count} mensajes sin leer`}>{item.unread_count > 99 ? "99+" : item.unread_count}</span>}

@@ -13,6 +13,7 @@ import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/sh
 import type { DebtNotice } from "../lib/inbox";
 import type { ChatTarget, Person, SocialData, SocialGroup } from "../lib/social";
 import { DebtNoticeList, MessageList } from "./inbox";
+import { RecentChats } from "./recent-chats";
 import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
 import { GroupBalances } from "./group-balances";
@@ -67,8 +68,8 @@ export default function Home() {
   const { client } = profile;
   const userId = profile.user?.id;
   const { inbox, refresh: refreshInbox } = useInbox(client, userId);
-  const recentChats = [...(inbox?.conversations ?? [])]
-    .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at)).slice(0, 4);
+  const [groupChatRevision, setGroupChatRevision] = useState(0);
+  const refreshGroupChats = useCallback(() => setGroupChatRevision((previous) => previous + 1), []);
 
   useEffect(() => {
     if (dialog !== "messages") return;
@@ -614,7 +615,9 @@ export default function Home() {
                     setDialog("messages"); void refreshInbox();
                   }}>Ver todos <ArrowRight size={15} /></button>}
                 </div>
-                {userId ? <MessageList conversations={recentChats} onOpen={openChat} />
+                {userId && client ? <RecentChats key={userId} client={client} userId={userId}
+                  friends={inbox?.conversations ?? []} groups={groupsForDebt}
+                  refreshKey={groupChatRevision} openFriend={openChat} openGroup={openGroupChat} />
                   : <div className="debt-list"><p className="empty">Inicia sesión para ver tus chats.</p></div>}
               </section>
             </div>
@@ -661,7 +664,7 @@ export default function Home() {
       {((dialog && dialog !== "messages") || active || (chatTarget && client && userId)) && <Modal close={() => {
         setDialog(null); setSelected(null); setChatTarget(null);
       }}>
-        {chatTarget && client && userId ? <ChatDialog key={`${userId}:${chatTarget.kind}:${chatTarget.id}`} client={client} userId={userId} target={chatTarget} trackRead={Boolean(inbox)} onChange={refreshInbox} />
+        {chatTarget && client && userId ? <ChatDialog key={`${userId}:${chatTarget.kind}:${chatTarget.id}`} client={client} userId={userId} target={chatTarget} trackRead={Boolean(inbox)} onChange={chatTarget.kind === "group" ? refreshGroupChats : refreshInbox} />
           : dialog === "invite" ? <>
           <h2 id="dialog-title">Invitación de PACTA</h2>
           <p className="dialog-description">{!invite ? "Este enlace no es válido." : !client

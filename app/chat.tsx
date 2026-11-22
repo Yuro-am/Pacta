@@ -107,7 +107,7 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
     stickToBottom.current = true;
     if (data) setMessages((previous) => [...previous.filter((item) => item.id !== data.id), data].slice(-50));
     if (history.current) history.current.scrollTop = history.current.scrollHeight;
-    if (!isGroup) onChange();
+    onChange();
     void refresh();
   }
 
