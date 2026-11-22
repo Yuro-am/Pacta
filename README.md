@@ -63,3 +63,9 @@ Si el correo no llega, revisa spam y usa **Iniciar sesión → Reenviar confirma
 Los dos participantes ven la deuda en **Actividad**. Quien recibe una propuesta puede aceptarla o rechazarla. La persona a la que deben dinero confirma que se cumplió el acuerdo. Las deudas compartidas aparecen en ambos saldos hasta que se saldan.
 
 PACTA empieza con el saldo a cero para quienes aún no registraron deudas. Los movimientos de ejemplo de versiones anteriores se retiran automáticamente y se conservan los movimientos que creaste manualmente sin iniciar sesión. Estos últimos siguen siendo locales y aparecen al usar la app sin una cuenta. Los grupos de ejemplo también siguen siendo locales.
+
+## Borrar una deuda
+
+Abre la deuda en **Actividad**, pulsa **Borrar deuda** y confirma. Se pueden borrar las deudas locales y las invitaciones aún sin aceptar. Cuando un amigo ya aceptó, la deuda queda visible para ambas cuentas.
+
+En Supabase, ejecuta [202611220002_delete_unclaimed_debts.sql](supabase/migrations/202611220002_delete_unclaimed_debts.sql) después de la migración inicial para habilitar el borrado de invitaciones pendientes.

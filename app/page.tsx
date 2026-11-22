@@ -247,6 +247,35 @@ export default function Home() {
     setMessage(notice);
   }
 
+  async function deleteDebt(debt: Debt) {
+    if (busy) return "Otra operación está en curso. Vuelve a intentarlo.";
+
+    if (debt.shared) {
+      if (!userId || !client || !debt.shared.invite) return "Esta deuda ya está compartida.";
+      setBusy(true);
+      try {
+        const { data, error } = await client.from("shared_debts").delete()
+          .eq("id", debt.id).select("id").maybeSingle();
+        if (error?.code === "42501") return "El borrado de invitaciones aún no está activado en Supabase.";
+        if (error) return "No se pudo borrar la deuda. Inténtalo de nuevo.";
+        if (!data) return "No se pudo borrar. La deuda puede estar ya compartida o borrada.";
+        sharedRevision.current++;
+        setShared((previous) => previous?.actor === userId
+          ? { ...previous, debts: previous.debts.filter((item) => item.id !== debt.id) }
+          : previous);
+      } catch {
+        return "No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.";
+      } finally {
+        setBusy(false);
+      }
+    } else {
+      setLocalDebts((previous) => previous.filter((item) => item.id !== debt.id));
+    }
+
+    setSelected((current) => current === debt.id ? null : current);
+    setMessage("Deuda borrada");
+  }
+
   function showGroup(name: string) {
     navigate("Grupos");
     setGroup(name);
@@ -417,7 +446,7 @@ export default function Home() {
             <button className="debt-row" key={debt.id} onClick={() => { setDialog(null); setSelected(debt.id); }}>
               <span className="tile lilac"><Bell size={19} /></span><span className="row-copy"><strong>{debt.title}</strong><small>{debt.friend} · {debt.offer?.method}</small></span><ChevronRight size={16} />
             </button>) : <p className="empty">No tienes propuestas pendientes.</p>}</div>
-        </> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} busy={busy} shareInvitation={shareInvitation} />}
+        </> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={deleteDebt} busy={busy} shareInvitation={shareInvitation} />}
       </Modal>}
       <div role="status" className={message ? "toast shown" : "toast"}>{message && <><Check size={17} />{message}</>}</div>
     </div>
@@ -444,18 +473,35 @@ function Modal({ children, close }: { children: React.ReactNode; close: () => vo
   </dialog>;
 }
 
-function DebtDetail({ debt, update, busy, shareInvitation }: {
+function DebtDetail({ debt, update, remove, busy, shareInvitation }: {
   debt: Debt;
   update: (value: Partial<Debt>, notice: string) => void;
+  remove: (debt: Debt) => Promise<string | undefined>;
   busy: boolean;
   shareInvitation: (token: string) => void;
 }) {
   const [method, setMethod] = useState<Method>("Dinero");
   const [confirming, setConfirming] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const stages = ["Propuesta", "Aceptada", "Saldada"];
   const progress = stages.indexOf(debt.stage);
   const inviteToken = debt.shared?.invite;
   const inviteUrl = inviteToken ? invitationUrl(inviteToken, window.location.origin).href : "";
+  if (confirmingDelete) return <>
+    <h2 id="dialog-title">¿Borrar deuda?</h2>
+    <p className="dialog-description">Se eliminará «{debt.title}» de tu actividad y de tu saldo.
+      {debt.shared && " El enlace de invitación dejará de funcionar."}
+    </p>
+    {deleteError && <p className="dialog-description" role="alert">{deleteError}</p>}
+    <div className="dialog-actions">
+      <button className="secondary" disabled={busy} onClick={() => { setConfirmingDelete(false); setDeleteError(""); }}>Cancelar</button>
+      <button className="danger" disabled={busy} onClick={async () => {
+        setDeleteError((await remove(debt)) ?? "");
+      }}>{busy ? "Borrando…" : "Sí, borrar deuda"}</button>
+    </div>
+  </>;
+
   return <>
     <h2 id="dialog-title">{debt.title}</h2>
     <p className="dialog-description">{debt.direction === "owe" ? `Le debes a ${debt.friend}` : `${debt.friend} te debe`} <strong>{euros(debt.amount)}</strong></p>
@@ -499,5 +545,8 @@ function DebtDetail({ debt, update, busy, shareInvitation }: {
       </>)}
       {debt.stage === "Saldada" && <p className="settled"><Check size={18} /> Deuda saldada</p>}
     </>}
+    {(!debt.shared || inviteToken) && <div className="dialog-actions debt-delete-actions">
+      <button className="danger" disabled={busy} onClick={() => setConfirmingDelete(true)}>Borrar deuda</button>
+    </div>}
   </>;
 }

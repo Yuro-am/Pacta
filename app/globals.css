@@ -176,3 +176,8 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 850; letter-spacing: -.06
 .profile-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; color: var(--muted); }
 .profile-actions button:disabled, .form-submit:disabled { cursor: wait; opacity: .65; }
 .invitation-button { margin-bottom: 15px; }
+
+.debt-delete-actions { margin-top: 18px; }
+.danger { background: #fce8eb; border: 0; border-radius: 11px; color: #a51934; font-weight: 740; min-height: 43px; padding: 8px 15px; }
+.danger:hover:not(:disabled) { background: #f9d7de; }
+.danger:disabled { cursor: wait; opacity: .65; }
