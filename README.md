@@ -95,3 +95,7 @@ En Supabase, abre **Authentication → Sign In / Providers → Email**, desactiv
 ## Repartir una deuda entre todo un grupo
 
 Ejecuta [202611220007_group_debt_split.sql](supabase/migrations/202611220007_group_debt_split.sql) en Supabase después de activar Amigos y Grupos. En **Nueva deuda**, selecciona **Registrar para → Todo un grupo**, elige el grupo e introduce el importe total. PACTA muestra cuánto corresponde a cada miembro que ya aceptó formar parte del grupo. Si el importe incluye tu parte, deja marcada **Incluir mi parte en el reparto**. Cada uno de los demás miembros recibe su deuda en su cuenta. El contador de **Grupos** muestra las solicitudes de amistad y las invitaciones de grupo pendientes.
+
+## Saldo por persona en un grupo
+
+Ejecuta [202611220008_group_balances.sql](supabase/migrations/202611220008_group_balances.sql) en Supabase después de activar Amigos y Grupos. En **Grupos → Abrir**, la tabla **Saldo por persona** muestra lo que debe y lo que le deben a cada miembro dentro de ese grupo. Solo los miembros aceptados pueden consultar el resumen. La tabla cuenta las deudas pendientes entre miembros y excluye las saldadas. Cada movimiento individual sigue siendo visible únicamente para las dos cuentas implicadas.

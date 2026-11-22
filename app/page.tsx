@@ -14,6 +14,7 @@ import type { Person, SocialData } from "../lib/social";
 import { DebtNoticeList, MessageList } from "./inbox";
 import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
+import { GroupBalances } from "./group-balances";
 import { GroupInvite, SocialPanel } from "./social";
 import { NewDebtForm, type GroupSplit } from "./new-debt";
 import { ProfileDialog, useProfile } from "./profile";
@@ -558,6 +559,9 @@ export default function Home() {
               ) : groups.find((item) => item.name === group)?.members.map((member, index) =>
                 <span key={member}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member === "Álex" ? initial : member[0]}</span>{member === "Álex" ? firstName : member}</span>
               )}</div>
+              {realGroup && client && userId && <GroupBalances key={`${userId}:${realGroup.id}`}
+                client={client} groupId={realGroup.id} userId={userId}
+                refreshKey={visibleDebts.map((debt) => `${debt.id}:${debt.stage}`).sort().join(",")} />}
               <div className="section-heading"><h2>Movimientos del grupo</h2></div>
               {debtList(visibleDebts)}
             </> : userId ? (social ? <SocialPanel data={social} run={runSocialAction} openGroup={showGroup} openChat={openChat} />

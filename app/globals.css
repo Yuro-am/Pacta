@@ -216,3 +216,11 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 850; letter-spacing: -.06
 .side-nav .group-request-count { margin-left: auto; }
 .bottom-nav button:has(.group-request-count) { position: relative; }
 .bottom-nav .group-request-count { position: absolute; top: 0; left: calc(50% + 8px); }
+
+.group-balances { margin-bottom: 22px; }
+.group-balance-table { width: 100%; border-collapse: collapse; }
+.group-balance-table th, .group-balance-table td { padding: 10px 12px; text-align: right; }
+.group-balance-table th:first-child { text-align: left; overflow-wrap: anywhere; }
+.group-balance-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.group-balance-table thead { background: #f5efff; color: var(--muted); }
+.group-balance-table tbody tr { border-top: 1px solid var(--line); }
