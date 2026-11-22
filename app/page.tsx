@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight,
-  CircleHelp, Coffee, Gift, HandHeart, Handshake, House, LayoutGrid, List, Pizza,
+  CircleDollarSign, CircleHelp, Coffee, Gift, HandHeart, House, LayoutGrid, List, Pizza,
   Plane, Plus, ReceiptText, Send, Sparkles, MessageCircle, UsersRound, Wallet, X,
 } from "lucide-react";
 import { euros, groups, type Debt, type Method } from "../lib/demo";
@@ -522,7 +522,7 @@ export default function Home() {
     <div className="app-shell">
       <aside className="sidebar">
         <button className="brand" onClick={() => setDialog("welcome")} aria-label="Bienvenida a Pacta">
-          <span className="brand-mark"><Handshake size={23} strokeWidth={2.1} /></span> pacta<span className="brand-dot">.</span>
+          <span className="brand-mark"><CircleDollarSign aria-hidden="true" size={23} strokeWidth={2.1} /></span> pacta<span className="brand-dot">.</span>
         </button>
         <nav className="side-nav" aria-label="Navegación principal">
           {nav.map(({ label, icon: Icon }) =>
@@ -542,7 +542,7 @@ export default function Home() {
 
       <main className="workspace">
         <header className="topbar">
-          <button className="brand mobile-brand" onClick={() => setDialog("welcome")} aria-label="Bienvenida a Pacta"><span className="brand-mark"><Handshake size={21} /></span> pacta<span className="brand-dot">.</span></button>
+          <button className="brand mobile-brand" onClick={() => setDialog("welcome")} aria-label="Bienvenida a Pacta"><span className="brand-mark"><CircleDollarSign aria-hidden="true" size={21} /></span> pacta<span className="brand-dot">.</span></button>
           <span className="top-label">Mi espacio</span>
           <div className="top-actions">
             <button className="icon-button notification" aria-label={unread ? `Notificaciones (${unread} sin leer)` : "Notificaciones"} onClick={() => {
@@ -673,7 +673,7 @@ export default function Home() {
             <AppearancePicker {...appearance} />
             <ShareAppButton className="secondary share-app-button" onClick={() => setDialog("shareApp")} />
           </>} initialMode={dialog === "access" ? "access" : dialog === "register" ? "register" : invite ? "login" : "profile"} /> : dialog === "welcome" ? <div className="welcome">
-          <span className="brand-mark"><Handshake size={39} /></span>
+          <span className="brand-mark"><CircleDollarSign aria-hidden="true" size={39} /></span>
           <h2 id="dialog-title">Bienvenido a PACTA<span className="brand-dot">.</span></h2>
           <p>Comparte gastos y salda cuentas a vuestra manera. Elegid entre dinero, comida, bebidas, favores y otras recompensas.</p>
           <button className="primary" onClick={() => { setDialog(null); navigate("Inicio"); }}>Entrar a Pacta <ArrowRight size={18} /></button>

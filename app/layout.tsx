@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { themeKey } from "../lib/appearance";
+import { accentKey, accents, themeKey } from "../lib/appearance";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,9 +8,14 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const initializeTheme = `try{if(localStorage.getItem(${JSON.stringify(themeKey)})==="dark")document.documentElement.dataset.theme="dark"}catch{}`;
+  const initializeAppearance = `try{
+    const root=document.documentElement.dataset;
+    if(localStorage.getItem(${JSON.stringify(themeKey)})==="dark")root.theme="dark";
+    const accent=localStorage.getItem(${JSON.stringify(accentKey)});
+    if(${JSON.stringify(accents.map(({ id }) => id))}.includes(accent))root.accent=accent
+  }catch{}`;
   return <html lang="es" suppressHydrationWarning>
-    <head><script dangerouslySetInnerHTML={{ __html: initializeTheme }} /></head>
+    <head><script dangerouslySetInnerHTML={{ __html: initializeAppearance }} /></head>
     <body>{children}</body>
   </html>;
 }
