@@ -113,3 +113,7 @@ Ejecuta [202611220011_chat_voice_notes.sql](supabase/migrations/202611220011_cha
 ### Chat de grupo
 
 Tras activar los audios, ejecuta [202611220012_group_chat.sql](supabase/migrations/202611220012_group_chat.sql). Abre **Grupos → Chat del grupo**, o elige el grupo en el menú del avión de papel para enviar texto, emojis y notas de voz. Solo los miembros aceptados pueden acceder al chat y a sus audios.
+
+### Fotos en el chat
+
+Tras activar el chat de grupo y las notas de voz, ejecuta [202611220013_chat_photos.sql](supabase/migrations/202611220013_chat_photos.sql). Pulsa **Adjuntar foto** en un chat privado o de grupo y revisa la vista previa antes de enviarla. Se admiten JPG, PNG, WebP y GIF de hasta 8 MB. Las descargas requieren acceso al chat.

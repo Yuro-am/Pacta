@@ -5,9 +5,10 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import type { ChatTarget } from "../lib/social";
 import type { createClient } from "../utils/supabase/client";
 
+import { ChatPhoto, PhotoComposer, photoBucket, type PhotoAttachment } from "./chat-photo";
 import { VoiceComposer, VoicePlayer, voiceBucket, type VoiceRecording } from "./voice-note";
 
-type Message = { id: string; sender_id: string; body: string; created_at: string; audio_path?: string | null };
+type Message = { id: string; sender_id: string; body: string; created_at: string; audio_path?: string | null; photo_path?: string | null };
 const emojis = ["😀", "😂", "😊", "😍", "😅", "🥲", "😎", "🤝", "👍", "🙌", "❤️", "🔥", "🎉", "🍕", "🍻", "💸"];
 const messageTime = new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" });
 
@@ -97,10 +98,10 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
     }
   }, [messages]);
 
-  async function sendMessage(id: string, body: string, audioPath?: string) {
+  async function sendMessage(id: string, body: string, attachment?: { audio_path: string } | { photo_path: string }) {
     const destination = isGroup ? { group_id: target.id } : { recipient_id: target.id };
     const { data, error } = await client.from(table)
-      .upsert({ id, ...destination, body, ...(audioPath ? { audio_path: audioPath } : {}) }, { ignoreDuplicates: true })
+      .upsert({ id, ...destination, body, ...attachment }, { ignoreDuplicates: true })
       .select("*").maybeSingle();
     if (error) throw error;
     revision.current++;
@@ -131,22 +132,24 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
     }
   }
 
-  async function sendAudio(recording: VoiceRecording) {
+  async function sendAttachment(file: VoiceRecording | PhotoAttachment, kind: "audio" | "photo") {
     if (sending) return false;
     setSending(true);
     setSendError("");
     const prefix = isGroup ? `groups/${target.id}/${userId}` : `${userId}/${target.id}`;
-    const path = `${prefix}/${recording.id}.${recording.extension}`;
+    const path = `${prefix}/${file.id}.${file.extension}`;
     try {
-      const { error } = await client.storage.from(voiceBucket).upload(path, recording.blob, {
-        contentType: recording.blob.type,
+      const { error } = await client.storage.from(kind === "audio" ? voiceBucket : photoBucket).upload(path, file.blob, {
+        contentType: file.blob.type,
         upsert: false,
       });
       if (error && error.status !== 409 && error.statusCode !== "409") throw error;
-      await sendMessage(recording.id, "Mensaje de voz", path);
+      if (kind === "audio") await sendMessage(file.id, "Mensaje de voz", { audio_path: path });
+      else await sendMessage(file.id, "Foto", { photo_path: path });
       return true;
     } catch {
-      setSendError("No se pudo enviar el audio. La grabación sigue disponible para reintentar.");
+      setSendError(kind === "audio" ? "No se pudo enviar el audio. La grabación sigue disponible para reintentar."
+        : "No se pudo enviar la foto. Puedes volver a intentarlo sin elegirla otra vez.");
       return false;
     } finally {
       setSending(false);
@@ -180,7 +183,8 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
         {target.kind === "group" && message.sender_id !== userId && <strong className="chat-author">
           {target.members.find((member) => member.id === message.sender_id)?.name ?? "Miembro del grupo"}
         </strong>}
-        {message.audio_path ? <VoicePlayer client={client} path={message.audio_path} /> : <p>{message.body}</p>}
+        {message.photo_path ? <ChatPhoto client={client} path={message.photo_path} />
+          : message.audio_path ? <VoicePlayer client={client} path={message.audio_path} /> : <p>{message.body}</p>}
         <time dateTime={message.created_at}>{messageTime.format(new Date(message.created_at))}</time>
       </div>)}
     </div>
@@ -190,7 +194,8 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
       <div className="chat-tools">
         <button className="icon-button" type="button" disabled={sending} aria-label="Emojis" title="Emojis"
           aria-expanded={emojiOpen} onClick={() => setEmojiOpen(!emojiOpen)}><Smile size={19} /></button>
-        <VoiceComposer sending={sending} send={sendAudio} />
+        <VoiceComposer sending={sending} send={(recording) => sendAttachment(recording, "audio")} />
+        <PhotoComposer sending={sending} send={(photo) => sendAttachment(photo, "photo")} />
       </div>
       {emojiOpen && <div className="emoji-picker" role="group" aria-label="Seleccionar emoji">
         {emojis.map((emoji) => <button type="button" disabled={sending} key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}
