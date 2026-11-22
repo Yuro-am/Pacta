@@ -48,6 +48,16 @@ Copia `.env.example` a `.env.local`. En el panel de tu proyecto Supabase, abre *
 
 Estas variables son públicas. Guarda las claves secretas y de tipo `service_role` fuera del cliente. Git ignora `.env.local`.
 
-La integración prepara los clientes de navegador y servidor y la renovación de sesiones mediante el proxy de Next.js. Si falta alguna de las dos variables, el proxy deja pasar las solicitudes y los clientes devuelven `null`. La demo sigue usando el almacenamiento local con o sin Supabase. Desde el avatar puedes cambiar el nombre de la demo. Con Supabase configurado, también puedes crear una cuenta, confirmar el correo, iniciar sesión y editar el nombre de tu cuenta. Las deudas y los grupos de la demo siguen siendo locales al navegador.
+La integración prepara los clientes de navegador y servidor y la renovación de sesiones mediante el proxy de Next.js. Si falta alguna de las dos variables, el proxy deja pasar las solicitudes y los clientes devuelven `null`. La demo sigue usando el almacenamiento local con o sin Supabase. Desde el avatar puedes cambiar el nombre de la demo. Con Supabase configurado, también puedes crear una cuenta, confirmar el correo, iniciar sesión y editar el nombre de tu cuenta. La demo sin cuenta y sus grupos siguen guardándose en el navegador.
 
 En **Authentication → URL Configuration** de Supabase, configura **Site URL** con el dominio HTTPS de PACTA. Añade `https://TU_DOMINIO/auth/callback` a **Redirect URLs**. Para desarrollo local, añade también `http://localhost:3000/auth/callback`. El enlace de confirmación debe abrirse en el mismo navegador donde empezaste el registro.
+
+## Activar las deudas compartidas
+
+1. Configura Supabase y Vercel como se indica arriba.
+2. En Supabase, abre **SQL Editor → New query**. Copia el contenido completo de [202611220001_shared_debts.sql](supabase/migrations/202611220001_shared_debts.sql), pégalo y pulsa **Run** una sola vez.
+3. En PACTA, inicia sesión y registra una deuda. Abre **Compartir invitación** y envía el enlace desde tu móvil. La otra persona inicia sesión con su propia cuenta y pulsa **Aceptar invitación**. El enlace caduca a los siete días y vincula una sola cuenta invitada.
+
+Los dos participantes ven la deuda en **Actividad**. Quien recibe una propuesta puede aceptarla o rechazarla. La persona a la que deben dinero confirma que se cumplió el acuerdo. Las deudas compartidas aparecen en ambos saldos hasta que se saldan.
+
+PACTA empieza con el saldo a cero para quienes aún no registraron deudas. Los movimientos de ejemplo de versiones anteriores se retiran automáticamente y se conservan los movimientos que creaste manualmente sin iniciar sesión. Estos últimos siguen siendo locales y aparecen al usar la app sin una cuenta. Los grupos de ejemplo también siguen siendo locales.
