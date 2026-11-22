@@ -109,3 +109,7 @@ Ejecuta [202611220010_realtime_debts.sql](supabase/migrations/202611220010_realt
 ### Audios y emojis
 
 Ejecuta [202611220011_chat_voice_notes.sql](supabase/migrations/202611220011_chat_voice_notes.sql) después de la migración de chat para activar las notas de voz. En un chat, pulsa el micrófono, graba hasta un minuto y escucha la vista previa antes de enviar. Solo los participantes pueden descargar la grabación del almacenamiento privado. La cara sonriente abre el selector de emojis del mensaje.
+
+### Chat de grupo
+
+Tras activar los audios, ejecuta [202611220012_group_chat.sql](supabase/migrations/202611220012_group_chat.sql). Abre **Grupos → Chat del grupo**, o elige el grupo en el menú del avión de papel para enviar texto, emojis y notas de voz. Solo los miembros aceptados pueden acceder al chat y a sus audios.

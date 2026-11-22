@@ -2,7 +2,7 @@
 
 import { Send, Smile } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import type { Person } from "../lib/social";
+import type { ChatTarget } from "../lib/social";
 import type { createClient } from "../utils/supabase/client";
 
 import { VoiceComposer, VoicePlayer, voiceBucket, type VoiceRecording } from "./voice-note";
@@ -11,13 +11,15 @@ type Message = { id: string; sender_id: string; body: string; created_at: string
 const emojis = ["😀", "😂", "😊", "😍", "😅", "🥲", "😎", "🤝", "👍", "🙌", "❤️", "🔥", "🎉", "🍕", "🍻", "💸"];
 const messageTime = new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" });
 
-export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
+export function ChatDialog({ client, userId, target, trackRead, onChange }: {
   client: NonNullable<ReturnType<typeof createClient>>;
   userId: string;
-  friend: Person;
+  target: ChatTarget;
   trackRead: boolean;
   onChange: () => void;
 }) {
+  const isGroup = target.kind === "group";
+  const table = isGroup ? "pacta_group_messages" : "pacta_messages";
   const [messages, setMessages] = useState<Message[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const textField = useRef<HTMLTextAreaElement>(null);
@@ -38,24 +40,25 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
     inFlight.current = true;
     const startedAt = revision.current;
     try {
-      const query = client.from("pacta_messages").select("*")
-        .or(`and(sender_id.eq.${userId},recipient_id.eq.${friend.id}),and(sender_id.eq.${friend.id},recipient_id.eq.${userId})`)
-        .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(50);
+      const history = client.from(table).select("*");
+      const conversation = isGroup ? history.eq("group_id", target.id)
+        : history.or(`and(sender_id.eq.${userId},recipient_id.eq.${target.id}),and(sender_id.eq.${target.id},recipient_id.eq.${userId})`);
+      const query = conversation.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(50);
       const { data, error } = await (signal ? query.abortSignal(signal) : query);
       if (signal?.aborted || startedAt !== revision.current) return;
       if (error) {
         setLoadError(["42P01", "PGRST205"].includes(error.code)
-          ? "El chat aún no está activado en Supabase."
+          ? isGroup ? "El chat de grupo aún no está activado en Supabase." : "El chat aún no está activado en Supabase."
           : "No se pudo cargar el chat. Vuelve a intentarlo.");
       } else {
         setLoadError("");
-        const latestIncoming = data?.find((item) => item.sender_id === friend.id);
+        const latestIncoming = data?.find((item) => item.sender_id !== userId);
         setMessages((previous) => {
           const recent = (data ?? []).reverse();
           return recent.length === previous.length && recent.every((item, index) => item.id === previous[index].id)
             ? previous : recent;
         });
-        if (trackRead && latestIncoming && !document.hidden && latestIncoming.id !== lastRead.current) {
+        if (!isGroup && trackRead && latestIncoming && !document.hidden && latestIncoming.id !== lastRead.current) {
           const id = latestIncoming.id;
           lastRead.current = id;
           void (async () => {
@@ -71,7 +74,7 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
       inFlight.current = false;
       if (!signal?.aborted) setLoading(false);
     }
-  }, [client, friend.id, onChange, trackRead, userId]);
+  }, [client, isGroup, onChange, table, target.id, trackRead, userId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -95,15 +98,16 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
   }, [messages]);
 
   async function sendMessage(id: string, body: string, audioPath?: string) {
-    const { data, error } = await client.from("pacta_messages")
-      .upsert({ id, recipient_id: friend.id, body, ...(audioPath ? { audio_path: audioPath } : {}) }, { ignoreDuplicates: true })
+    const destination = isGroup ? { group_id: target.id } : { recipient_id: target.id };
+    const { data, error } = await client.from(table)
+      .upsert({ id, ...destination, body, ...(audioPath ? { audio_path: audioPath } : {}) }, { ignoreDuplicates: true })
       .select("*").maybeSingle();
     if (error) throw error;
     revision.current++;
     stickToBottom.current = true;
     if (data) setMessages((previous) => [...previous.filter((item) => item.id !== data.id), data].slice(-50));
     if (history.current) history.current.scrollTop = history.current.scrollHeight;
-    onChange();
+    if (!isGroup) onChange();
     void refresh();
   }
 
@@ -131,7 +135,8 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
     if (sending) return false;
     setSending(true);
     setSendError("");
-    const path = `${userId}/${friend.id}/${recording.id}.${recording.extension}`;
+    const prefix = isGroup ? `groups/${target.id}/${userId}` : `${userId}/${target.id}`;
+    const path = `${prefix}/${recording.id}.${recording.extension}`;
     try {
       const { error } = await client.storage.from(voiceBucket).upload(path, recording.blob, {
         contentType: recording.blob.type,
@@ -163,7 +168,7 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
   }
 
   return <>
-    <h2 id="dialog-title">Chat con {friend.name}</h2>
+    <h2 id="dialog-title">{isGroup ? "Chat de" : "Chat con"} {target.name}</h2>
     <div className="chat-history" ref={history} role="log" aria-label="Mensajes" onScroll={(event) => {
       const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
       stickToBottom.current = scrollHeight - scrollTop - clientHeight < 60;
@@ -172,13 +177,16 @@ export function ChatDialog({ client, userId, friend, trackRead, onChange }: {
       {loadError && <p role="status">{loadError} <button className="back" onClick={() => refresh()}>Reintentar</button></p>}
       {!loading && !loadError && !messages.length && <p>Escribe el primer mensaje.</p>}
       {messages.map((message) => <div className={message.sender_id === userId ? "chat-bubble chat-mine" : "chat-bubble"} key={message.id}>
+        {target.kind === "group" && message.sender_id !== userId && <strong className="chat-author">
+          {target.members.find((member) => member.id === message.sender_id)?.name ?? "Miembro del grupo"}
+        </strong>}
         {message.audio_path ? <VoicePlayer client={client} path={message.audio_path} /> : <p>{message.body}</p>}
         <time dateTime={message.created_at}>{messageTime.format(new Date(message.created_at))}</time>
       </div>)}
     </div>
     <form className="form" onSubmit={send}>
       <label>Mensaje<textarea ref={textField} value={draft} onChange={(event) => setDraft(event.target.value)}
-        disabled={sending} rows={2} maxLength={1000} required placeholder="Escribe a tu amigo…" /></label>
+        disabled={sending} rows={2} maxLength={1000} required placeholder={isGroup ? "Escribe al grupo…" : "Escribe a tu amigo…"} /></label>
       <div className="chat-tools">
         <button className="icon-button" type="button" disabled={sending} aria-label="Emojis" title="Emojis"
           aria-expanded={emojiOpen} onClick={() => setEmojiOpen(!emojiOpen)}><Smile size={19} /></button>

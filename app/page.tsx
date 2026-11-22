@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight,
   CircleHelp, Coffee, Gift, HandHeart, Handshake, House, LayoutGrid, List, Pizza,
-  Plane, Plus, ReceiptText, Send, Sparkles, UsersRound, Wallet, X,
+  Plane, Plus, ReceiptText, Send, Sparkles, MessageCircle, UsersRound, Wallet, X,
 } from "lucide-react";
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
 import { watchSharedDebts } from "../lib/debt-realtime";
 import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/shared-debts";
 import type { DebtNotice } from "../lib/inbox";
-import type { Person, SocialData } from "../lib/social";
+import type { ChatTarget, Person, SocialData, SocialGroup } from "../lib/social";
 import { DebtNoticeList, MessageList } from "./inbox";
 import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
@@ -57,7 +57,7 @@ export default function Home() {
   const checkedFirstAccess = useRef(false);
   const messageArea = useRef<HTMLDivElement>(null);
   const messageButton = useRef<HTMLButtonElement>(null);
-  const [chatFriend, setChatFriend] = useState<Person | null>(null);
+  const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState<"Todo" | "Pendientes" | "Saldadas">("Todo");
@@ -85,7 +85,7 @@ export default function Home() {
       document.removeEventListener("keydown", dismissOnEscape);
     };
   }, [dialog]);
-  useEffect(() => { setChatFriend(null); }, [userId]);
+  useEffect(() => { setChatTarget(null); }, [userId]);
   const sharedUnavailable = sharedError?.actor === userId && sharedError?.missing;
   const usingShared = Boolean(userId && !sharedUnavailable);
   const social = socialState?.actor === userId ? socialState?.data : undefined;
@@ -264,10 +264,18 @@ export default function Home() {
     }
   }
 
-  function openChat(friend: Person) {
+  function openConversation(target: ChatTarget) {
     setDialog(null);
     setSelected(null);
-    setChatFriend(friend);
+    setChatTarget(target);
+  }
+
+  function openChat(friend: Person) {
+    openConversation({ kind: "friend", id: friend.id, name: friend.name });
+  }
+
+  function openGroupChat(group: SocialGroup) {
+    openConversation({ kind: "group", id: group.id, name: group.name, members: group.members });
   }
 
   async function openDebtNotice(notice: DebtNotice) {
@@ -559,6 +567,14 @@ export default function Home() {
                   <button onClick={() => { setDialog(null); navigate("Grupos"); }}>Nuevo mensaje</button>
                 </div>
                 <MessageList conversations={inbox?.conversations ?? []} onOpen={openChat} />
+                {groupsForDebt.length > 0 && <section className="group-chats">
+                  <h3>Chats de grupo</h3>
+                  <div className="group-list">{groupsForDebt.map((item) => <button key={item.id} className="group-row" onClick={() => openGroupChat(item)}>
+                    <span className="tile lilac"><UsersRound size={18} /></span>
+                    <span className="row-copy"><strong>{item.name}</strong></span>
+                    <ChevronRight className="row-chevron" size={16} />
+                  </button>)}</div>
+                </section>}
               </section>}
             </div>}
             <button className="avatar top-avatar" onClick={() => setDialog("profile")} aria-label="Mi perfil">{initial}</button>
@@ -600,6 +616,7 @@ export default function Home() {
             <div className="page-heading"><div><h1>{groupName ?? "Amigos y grupos"}</h1><p>{group ? "Las cuentas de vuestro grupo, en un solo lugar." : "Compartid planes y llevad las cuentas al día."}</p></div>
             <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
             {groupName ? <>
+              {realGroup && <button className="secondary invitation-button" onClick={() => openGroupChat(realGroup)}><MessageCircle size={18} /> Chat del grupo</button>}
               {realGroup && social && <GroupInvite group={realGroup} friends={social.friends} run={runSocialAction} />}
               <div className="members">{realGroup ? realGroup.members.map((member, index) =>
                 <span key={member.id}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member.name[0]}</span>{member.name}</span>
@@ -633,10 +650,10 @@ export default function Home() {
         <button onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
 
-      {((dialog && dialog !== "messages") || active || (chatFriend && client && userId)) && <Modal close={() => {
-        setDialog(null); setSelected(null); setChatFriend(null);
+      {((dialog && dialog !== "messages") || active || (chatTarget && client && userId)) && <Modal close={() => {
+        setDialog(null); setSelected(null); setChatTarget(null);
       }}>
-        {chatFriend && client && userId ? <ChatDialog key={`${userId}:${chatFriend.id}`} client={client} userId={userId} friend={chatFriend} trackRead={Boolean(inbox)} onChange={refreshInbox} />
+        {chatTarget && client && userId ? <ChatDialog key={`${userId}:${chatTarget.kind}:${chatTarget.id}`} client={client} userId={userId} target={chatTarget} trackRead={Boolean(inbox)} onChange={refreshInbox} />
           : dialog === "invite" ? <>
           <h2 id="dialog-title">Invitación de PACTA</h2>
           <p className="dialog-description">{!invite ? "Este enlace no es válido." : !client

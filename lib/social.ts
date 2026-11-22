@@ -8,3 +8,5 @@ export type SocialGroup = {
   members: Person[];
 };
 export type SocialData = { friends: Friend[]; groups: SocialGroup[] };
+
+export type ChatTarget = (Person & { kind: "friend" }) | (Person & { kind: "group"; members: Person[] });
