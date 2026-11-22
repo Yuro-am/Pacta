@@ -185,8 +185,6 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 850; letter-spacing: -.06
 .friend-section h3 { font-size: 15px; font-weight: 780; }
 .incoming-requests { background: #f7f2ff; border: 1px solid #eee4ff; border-radius: 12px; padding: 11px; }
 .incoming-requests h3 span { color: var(--purple); margin-left: 4px; }
-.social-code summary { cursor: pointer; color: var(--purple); font-weight: 700; }
-.social-code label, .social-code button { margin-top: 9px; }
 .chat-history { display: flex; flex-direction: column; gap: 10px; overflow: auto; max-height: min(46vh, 360px); min-height: 100px; padding: 12px; margin: 14px 0; background: var(--background); border-radius: 12px; }
 .chat-bubble { align-self: flex-start; max-width: 85%; padding: 8px 11px; border-radius: 12px; background: white; border: 1px solid var(--line); }
 .chat-bubble p { white-space: pre-wrap; overflow-wrap: anywhere; }

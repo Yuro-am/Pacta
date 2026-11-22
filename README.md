@@ -74,7 +74,7 @@ En Supabase, ejecuta [202611220002_delete_unclaimed_debts.sql](supabase/migratio
 
 En Supabase, ejecuta [202611220003_friends_and_groups.sql](supabase/migrations/202611220003_friends_and_groups.sql) una vez después de la migración inicial de deudas.
 
-En PACTA, inicia sesión y abre **Grupos**. Escribe el correo exacto o el código de amigo de la otra persona, envía una solicitud y pídele que pulse **Aceptar** en su sección **Amigos**. A partir de entonces puedes seleccionar a esa persona al registrar una deuda. La verá en **Actividad** desde su cuenta.
+En PACTA, inicia sesión y abre **Grupos**. Escribe el nombre de usuario exacto de la otra persona, con o sin `@`, envía una solicitud y pídele que pulse **Aceptar** en su sección **Amigos**. A partir de entonces puedes seleccionar a esa persona al registrar una deuda. La verá en **Actividad** desde su cuenta.
 
 En **Grupos**, crea un grupo, ábrelo y selecciona a un amigo para invitarlo. La otra persona acepta desde esa misma sección. Para añadir una deuda al grupo, ábrelo y pulsa **Nueva deuda** o **Añadir**. Una deuda sigue siendo privada entre las dos personas implicadas, incluso dentro de un grupo.
 
@@ -85,3 +85,9 @@ Ejecuta [202611220004_friend_chat.sql](supabase/migrations/202611220004_friend_c
 ## Bandeja de mensajes y notificaciones
 
 Ejecuta [202611220005_inbox_and_notifications.sql](supabase/migrations/202611220005_inbox_and_notifications.sql) en Supabase después de activar el chat. El icono del avión de papel en la esquina superior derecha abre tus conversaciones recientes. La campana avisa de los mensajes sin leer, las deudas nuevas y los cambios en propuestas o pagos. Pulsa un aviso para abrir la conversación o la deuda. Los avisos aparecen dentro de PACTA mientras tienes la app abierta.
+
+## Nombres de usuario y registro sin confirmación
+
+Ejecuta [202611220006_usernames.sql](supabase/migrations/202611220006_usernames.sql) en Supabase después de la migración de Amigos y Grupos. Las cuentas existentes eligen su nombre de usuario en **Mi perfil → Guardar perfil**. Las cuentas nuevas lo eligen al registrarse. Los nombres son únicos y las solicitudes de amistad usan el nombre de usuario exacto. El correo se sigue usando para iniciar sesión.
+
+En Supabase, abre **Authentication → Sign In / Providers → Email**, desactiva **Confirm email** y guarda. Las cuentas nuevas podrán iniciar sesión al registrarse. Si una cuenta creada antes sigue pendiente, comprueba su estado en **Authentication → Users**. Este ajuste permite registrar una cuenta sin demostrar acceso al buzón, por eso la búsqueda de amigos usa el nombre de usuario.

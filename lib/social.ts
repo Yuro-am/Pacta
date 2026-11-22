@@ -1,5 +1,5 @@
 export type Person = { id: string; name: string };
-export type Friend = Person & { accepted: boolean; incoming: boolean };
+export type Friend = Person & { accepted: boolean; incoming: boolean; username?: string | null };
 export type SocialGroup = {
   id: string;
   name: string;

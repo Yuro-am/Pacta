@@ -6,14 +6,12 @@ import type { Person, SocialData, SocialGroup } from "../lib/social";
 
 type RunAction = (name: string, args: Record<string, string>) => Promise<boolean>;
 
-export function SocialPanel({ data, userId, run, openGroup, openChat }: {
+export function SocialPanel({ data, run, openGroup, openChat }: {
   data: SocialData;
-  userId: string;
   run: RunAction;
   openGroup: (id: string) => void;
   openChat: (friend: Person) => void;
 }) {
-  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const incoming = data.friends.filter((friend) => !friend.accepted && friend.incoming);
   const outgoing = data.friends.filter((friend) => !friend.accepted && !friend.incoming);
@@ -38,7 +36,7 @@ export function SocialPanel({ data, userId, run, openGroup, openChat }: {
       {incoming.length > 0 && <section className="friend-section incoming-requests">
         <h3>Solicitudes recibidas <span>{incoming.length}</span></h3>
         {incoming.map((friend) => <div className="social-row" key={friend.id}>
-          <span><strong>{friend.name}</strong><small>Quiere añadirte como amigo</small></span>
+          <span><strong>{friend.name}</strong>{friend.username && <small>@{friend.username}</small>}<small>Quiere añadirte como amigo</small></span>
           <div className="social-actions">
             <button className="primary" onClick={() => run("pacta_friend", { p_user: friend.id, p_action: "accept" })}>Aceptar</button>
             <button className="secondary" onClick={() => run("pacta_friend", { p_user: friend.id, p_action: "reject" })}>Rechazar</button>
@@ -46,24 +44,14 @@ export function SocialPanel({ data, userId, run, openGroup, openChat }: {
         </div>)}
       </section>}
       <form className="form" onSubmit={(event) => submit(event, "pacta_request_friend", (value) => ({ p_identifier: value }))}>
-        <label>Correo o código de tu amigo<input name="value" placeholder="Ej. ana@ejemplo.com" required maxLength={254}
+        <label>Nombre de usuario de tu amigo<input name="value" placeholder="Ej. @ana_21" required maxLength={25} pattern="@?[a-zA-Z0-9_]{3,24}"
           autoCapitalize="none" spellCheck={false} /></label>
         <button className="primary" disabled={busy}>Enviar solicitud</button>
       </form>
-      <details className="social-code">
-        <summary>Ver mi código de amigo</summary>
-        <label>Tu código de amigo
-          <input readOnly value={userId} onFocus={(event) => event.currentTarget.select()} />
-        </label>
-        <button className="secondary" onClick={async () => {
-          try { await navigator.clipboard.writeText(userId); setCopied(true); }
-          catch { setCopied(false); }
-        }}>{copied ? "Código copiado" : "Copiar mi código"}</button>
-      </details>
       <section className="friend-section">
         <h3>Mis amigos</h3>
         {friends.length ? friends.map((friend) => <div className="social-row" key={friend.id}>
-          <span><strong>{friend.name}</strong></span>
+          <span><strong>{friend.name}</strong>{friend.username && <small>@{friend.username}</small>}</span>
           <button className="secondary" onClick={() => openChat(friend)} aria-label={`Abrir chat con ${friend.name}`}>
             <MessageCircle size={17} /> Chat
           </button>
@@ -72,7 +60,7 @@ export function SocialPanel({ data, userId, run, openGroup, openChat }: {
       {outgoing.length > 0 && <section className="friend-section">
         <h3>Solicitudes enviadas</h3>
         {outgoing.map((friend) => <div className="social-row" key={friend.id}>
-          <span><strong>{friend.name}</strong><small>Pendiente de aceptar</small></span>
+          <span><strong>{friend.name}</strong>{friend.username && <small>@{friend.username}</small>}<small>Pendiente de aceptar</small></span>
         </div>)}
       </section>}
     </section>

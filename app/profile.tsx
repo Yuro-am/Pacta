@@ -6,6 +6,7 @@ import { createClient } from "../utils/supabase/client";
 
 const defaultName = "Álex García";
 const nameKey = "pacta-profile-name-v1";
+const usernamePattern = "[a-zA-Z0-9_]{3,24}";
 
 export function useProfile() {
   const [client] = useState(createClient);
@@ -71,6 +72,8 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
   const [emailDraft, setEmailDraft] = useState("");
   const [resendCoolingDown, setResendCoolingDown] = useState(false);
   const [sessionDelayed, setSessionDelayed] = useState(false);
+  const [username, setUsername] = useState("");
+  const [loadingUsername, setLoadingUsername] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [feedback, setFeedback] = useState<{ text: string; error?: boolean }>();
   const showProfile = Boolean(user) || mode === "profile";
@@ -87,6 +90,30 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
     return () => clearTimeout(timer);
   }, [resendCoolingDown]);
 
+  useEffect(() => {
+    if (!client || !user) return;
+    let active = true;
+    setLoadingUsername(true);
+    void client.rpc("pacta_my_username").then(({ data }) => {
+      if (!active) return;
+      const suggested: unknown = user.user_metadata.requested_username;
+      if (typeof data === "string") setUsername(data);
+      else setUsername(typeof suggested === "string" && new RegExp(`^${usernamePattern}$`).test(suggested) ? suggested : "");
+      setLoadingUsername(false);
+    });
+    return () => { active = false; };
+  }, [client, user]);
+
+  async function saveUsername(value: string) {
+    if (!client || !value) return;
+    const { error } = await client.rpc("pacta_set_username", { p_username: value });
+    if (!error) return;
+
+    return error.code === "23505" ? "Ese nombre de usuario ya está ocupado. Elige otro."
+      : error.code === "PGRST202" ? "El nombre de usuario aún no está activado en Supabase."
+      : "No se pudo guardar el nombre de usuario. Inténtalo de nuevo.";
+  }
+
   function switchMode(value: typeof mode) {
     const input = formRef.current?.elements.namedItem("email");
     if (input instanceof HTMLInputElement) setEmailDraft(input.value.trim());
@@ -99,6 +126,11 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
     if (busy || loading) return;
     const form = new FormData(event.currentTarget);
     const displayName = String(form.get("name") ?? "").trim();
+    const handle = String(form.get("username") ?? "").trim().toLowerCase();
+    if ((mode === "register" || handle) && !new RegExp(`^${usernamePattern}$`).test(handle)) {
+      setFeedback({ text: "Usa entre 3 y 24 letras, números o guiones bajos.", error: true });
+      return;
+    }
     if ((showProfile || mode === "register") && !displayName) {
       setFeedback({ text: "Escribe el nombre que quieres mostrar.", error: true });
       return;
@@ -109,8 +141,14 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
     try {
       if (showProfile) {
         if (user && client) {
+          const handleError = await saveUsername(handle);
+          if (handleError) {
+            setFeedback({ text: handleError, error: true });
+            return;
+          }
           const { error } = await client.auth.updateUser({ data: { display_name: displayName } });
           if (error) throw error;
+          if (handle) setUsername(handle);
         } else {
           saveDemoName(displayName);
         }
@@ -128,16 +166,20 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
           email,
           password,
           options: {
-            data: { display_name: displayName },
+            data: { display_name: displayName, requested_username: handle },
             emailRedirectTo: new URL("/auth/callback", window.location.origin).href,
           },
         });
         if (error) throw error;
         setMode(data.session ? "profile" : "login");
-        if (!data.session) setResendCoolingDown(true);
-        setFeedback({ text: data.session
-          ? "Cuenta creada."
-          : "Revisa tu correo y la carpeta de spam. Si ya tenías cuenta, puedes iniciar sesión o reenviar la confirmación." });
+        if (data.session) {
+          const handleError = await saveUsername(handle);
+          setUsername(handle);
+          setFeedback({ text: handleError ? `Cuenta creada. ${handleError}` : "Cuenta creada. Ya has iniciado sesión.", error: Boolean(handleError) });
+        } else {
+          setResendCoolingDown(true);
+          setFeedback({ text: "Tu cuenta está pendiente. Si Supabase pide confirmación, revisa tu correo o solicita un reenvío." });
+        }
       } else {
         const { error } = await client.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -191,6 +233,8 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
       const { error } = await client.auth.signOut({ scope: "local" });
       if (error) throw error;
       setMode("profile");
+      setUsername("");
+      setLoadingUsername(false);
       setFeedback({ text: "Sesión cerrada." });
     } catch {
       setFeedback({ text: "No se pudo cerrar la sesión. Inténtalo de nuevo.", error: true });
@@ -212,14 +256,20 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
         {(showProfile || mode === "register") && <label>Nombre
           <input name="name" autoComplete="name" defaultValue={showProfile ? name : ""} required maxLength={50} />
         </label>}
+        {(user || mode === "register") && <label>Nombre de usuario
+          <input name="username" value={username} onChange={(event) => setUsername(event.target.value)}
+            autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="Ej. yurik_21" pattern={usernamePattern}
+            required={mode === "register"} maxLength={24} disabled={loadingUsername || busy} />
+          <small>Entre 3 y 24 letras, números o guiones bajos. Tus amigos te buscarán por este nombre.</small>
+        </label>}
         {!showProfile && <>
           <label>Correo electrónico<input name="email" type="email" autoComplete="email" defaultValue={emailDraft} required /></label>
           <label>Contraseña<input name="password" type="password"
             autoComplete={mode === "register" ? "new-password" : "current-password"}
             minLength={mode === "register" ? 8 : undefined} required /></label>
         </>}
-        <button className="primary form-submit" type="submit" disabled={busy}>
-          {busy ? "Un momento…" : showProfile ? "Guardar nombre" : mode === "register" ? "Crear cuenta" : "Iniciar sesión"}
+        <button className="primary form-submit" type="submit" disabled={busy || loadingUsername}>
+          {busy ? "Un momento…" : showProfile ? (user ? "Guardar perfil" : "Guardar nombre") : mode === "register" ? "Crear cuenta" : "Iniciar sesión"}
         </button>
       </form>
       <div className="profile-actions">

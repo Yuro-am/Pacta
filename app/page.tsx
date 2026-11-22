@@ -208,7 +208,7 @@ export default function Home() {
       const { error } = await client.rpc(name, args);
       if (error) throw error;
       await refreshSocial();
-      setMessage(name === "pacta_request_friend" ? "Si el correo o código corresponde a una cuenta, recibirá tu solicitud."
+      setMessage(name === "pacta_request_friend" ? "Si el usuario existe, recibirá tu solicitud."
         : name === "pacta_group_member" && args.p_action === "invite" ? "Invitación guardada."
         : "Cambios guardados.");
       return true;
@@ -543,7 +543,7 @@ export default function Home() {
               )}</div>
               <div className="section-heading"><h2>Movimientos del grupo</h2></div>
               {debtList(visibleDebts)}
-            </> : userId ? (social ? <SocialPanel data={social} userId={userId} run={runSocialAction} openGroup={showGroup} openChat={openChat} />
+            </> : userId ? (social ? <SocialPanel data={social} run={runSocialAction} openGroup={showGroup} openChat={openChat} />
               : <p role="status">{socialUnavailableFor === userId ? "Amigos y grupos aún no están disponibles. Comprueba la configuración de Supabase." : "Cargando amigos y grupos…"}</p>)
               : <><button className="secondary invitation-button" onClick={() => setDialog("profile")}>Inicia sesión para añadir amigos y grupos</button>
                 <div className="groups-page">{groupList()}</div></>}
