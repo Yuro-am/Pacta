@@ -12,7 +12,8 @@ import { watchSharedDebts } from "../lib/debt-realtime";
 import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/shared-debts";
 import type { DebtNotice } from "../lib/inbox";
 import type { ChatTarget, Person, SocialData, SocialGroup } from "../lib/social";
-import { DebtNoticeList, MessageList } from "./inbox";
+import { MessageList } from "./inbox";
+import { Notifications } from "./notifications";
 import { RecentChats } from "./recent-chats";
 import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
@@ -102,9 +103,12 @@ export default function Home() {
   const active = debts.find((debt) => debt.id === selected);
   const pendingSocial = (social?.friends.filter((friend) => friend.incoming && !friend.accepted).length ?? 0)
     + (social?.groups.filter((item) => !item.accepted).length ?? 0);
-  const proposals = debts.filter((debt) => debt.stage === "Propuesta" && (!debt.shared || debt.shared.canRespond)
-    && !inbox?.notices.some((notice) => notice.kind === "proposal" && notice.debt_id === debt.id));
-  const unread = (inbox?.unread_messages ?? 0) + (inbox?.unread_debts ?? 0) + proposals.length + pendingSocial;
+  const proposals = debts.filter((debt) => debt.stage === "Propuesta" && (!debt.shared || debt.shared.canRespond));
+  const proposalIds = new Set(proposals.map((debt) => debt.id));
+  const notices = (inbox?.notices ?? []).filter((notice) => notice.kind !== "proposal" || !proposalIds.has(notice.debt_id));
+  const hiddenUnreadProposals = inbox?.notices.filter((notice) => notice.unread && notice.kind === "proposal" && proposalIds.has(notice.debt_id)).length ?? 0;
+  const unread = (inbox?.unread_messages ?? 0) + Math.max(0, (inbox?.unread_debts ?? 0) - hiddenUnreadProposals)
+    + proposals.length + pendingSocial;
   const owed = debts.reduce((sum, debt) => sum + (debt.stage !== "Saldada" && debt.direction === "owed" ? Math.round(debt.amount * 100) : 0), 0) / 100;
   const owe = debts.reduce((sum, debt) => sum + (debt.stage !== "Saldada" && debt.direction === "owe" ? Math.round(debt.amount * 100) : 0), 0) / 100;
 
@@ -311,6 +315,20 @@ export default function Home() {
       await client.rpc("pacta_read_debt_notice", { p_notice: notice.id });
       void refreshInbox();
     }
+  }
+
+  async function markDebtNotices(items: DebtNotice[]) {
+    if (!client || !userId || !items.length) return;
+    const results = await Promise.all(items.map((notice) => client.rpc("pacta_read_debt_notice", { p_notice: notice.id })));
+    await refreshInbox();
+    if (results.some(({ error }) => error)) throw new Error("Some notices remain unread");
+  }
+
+  function openProposal(debt: Debt) {
+    setDialog(null);
+    setSelected(debt.id);
+    const related = inbox?.notices.filter((notice) => notice.kind === "proposal" && notice.debt_id === debt.id && notice.unread) ?? [];
+    void markDebtNotices(related).catch(() => undefined);
   }
 
   function storeSharedDebt(row: SharedDebtRow, actor: string) {
@@ -547,7 +565,7 @@ export default function Home() {
           <button className="brand mobile-brand" onClick={() => setDialog("welcome")} aria-label="Bienvenida a Pacta"><span className="brand-mark"><CircleDollarSign aria-hidden="true" size={21} /></span> pacta<span className="brand-dot">.</span></button>
           <span className="top-label">Mi espacio</span>
           <div className="top-actions">
-            <button className="icon-button notification" aria-label={unread ? `Notificaciones (${unread} sin leer)` : "Notificaciones"} onClick={() => {
+            <button className="icon-button notification" aria-label={unread ? `Notificaciones (${unread} pendientes)` : "Notificaciones"} onClick={() => {
               setDialog("notifications"); void refreshInbox();
             }}><Bell size={19} />{unread > 0 && <span className="notification-count">{unread > 99 ? "99+" : unread}</span>}</button>
             {userId && <div className="message-area" ref={messageArea}>
@@ -692,27 +710,10 @@ export default function Home() {
           <h2 id="dialog-title">Nueva deuda</h2><p className="dialog-description">Añade un gasto compartido o algo que quedó pendiente.</p>
           <NewDebtForm friends={friendsForDebt} onlineGroups={groupsForDebt} userId={userId}
             initialGroup={group} usingShared={usingShared} disabled={busy || profile.loading} save={addDebt} />
-        </> : dialog === "notifications" ? <>
-          <h2 id="dialog-title">Notificaciones</h2>
-          <p className="dialog-description">Mensajes, solicitudes y cambios en tus deudas.</p>
-          {Boolean(inbox?.conversations.some((item) => item.unread_count > 0)) && <section className="notification-section">
-            <h3>Mensajes nuevos</h3>
-            <MessageList conversations={inbox!.conversations.filter((item) => item.unread_count > 0)} onOpen={openChat} />
-          </section>}
-          {Boolean(inbox?.notices.length) && <section className="notification-section">
-            <h3>Deudas</h3>
-            <DebtNoticeList notices={inbox!.notices} onOpen={openDebtNotice} />
-          </section>}
-          {pendingSocial > 0 && <button className="secondary invitation-button" onClick={() => {
-            setDialog(null);
-            navigate("Grupos");
-          }}>Ver solicitudes de amigos y grupos ({pendingSocial})</button>}
-          {proposals.length > 0 && <div className="debt-list">{proposals.map((debt) =>
-            <button className="debt-row" key={debt.id} onClick={() => { setDialog(null); setSelected(debt.id); }}>
-              <span className="tile lilac"><Bell size={19} /></span><span className="row-copy"><strong>{debt.title}</strong><small>{debt.friend} · {debt.offer?.method}</small></span><ChevronRight size={16} />
-            </button>)}</div>}
-          {!unread && !inbox?.notices.length && <p className="empty">Estás al día. Los avisos aparecerán aquí.</p>}
-        </> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={deleteDebt} busy={busy} shareInvitation={shareInvitation} />}
+        </> : dialog === "notifications" ? <Notifications pending={unread} requests={pendingSocial} proposals={proposals}
+          messages={inbox?.conversations.filter((item) => item.unread_count > 0) ?? []} notices={notices}
+          openChat={openChat} openDebt={openDebtNotice} openProposal={openProposal} markRead={markDebtNotices}
+          openRequests={() => { setDialog(null); navigate("Grupos"); }} /> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={deleteDebt} busy={busy} shareInvitation={shareInvitation} />}
       </Modal>}
       <div role="status" className={message ? "toast shown" : "toast"}>{message && <><Check size={17} />{message}</>}</div>
     </div>
