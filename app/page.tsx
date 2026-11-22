@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
-import { describeSharedDebt, type SharedDebtRow } from "../lib/shared-debts";
+import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/shared-debts";
 import { ProfileDialog, useProfile } from "./profile";
 
 const nav = [
@@ -37,7 +37,7 @@ export default function Home() {
   const [inviteError, setInviteError] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState<"Todo" | "Pendientes" | "Saldadas">("Todo");
@@ -160,8 +160,7 @@ export default function Home() {
   }
 
   async function shareInvitation(token: string) {
-    const link = new URL("/", window.location.origin);
-    link.searchParams.set("invite", token);
+    const link = invitationUrl(token, window.location.origin);
     try {
       if (navigator.share) await navigator.share({ title: "Invitación de PACTA", url: link.href });
       else {
@@ -385,9 +384,13 @@ export default function Home() {
             : "Entra o crea una cuenta para añadir esta deuda compartida."}</p>
           {invite && client && !profile.loading && (userId
             ? <button className="primary" disabled={busy} onClick={joinInvitation}>Aceptar invitación</button>
-            : <button className="primary" onClick={() => setDialog("profile")}>Entrar o crear cuenta</button>)}
+            : <div className="dialog-actions">
+              <button className="secondary" onClick={() => setDialog("profile")}>Ya tengo cuenta</button>
+              <button className="primary" onClick={() => setDialog("register")}>Crear cuenta</button>
+            </div>)}
           {inviteError && <p role="alert" className="dialog-description">{inviteError}</p>}
-        </> : dialog === "profile" ? <ProfileDialog profile={profile} /> : dialog === "welcome" ? <div className="welcome">
+        </> : (dialog === "profile" || dialog === "register") ? <ProfileDialog
+          profile={profile} initialMode={dialog === "register" ? "register" : invite ? "login" : "profile"} /> : dialog === "welcome" ? <div className="welcome">
           <span className="brand-mark"><Handshake size={39} /></span>
           <h2 id="dialog-title">Bienvenido a PACTA<span className="brand-dot">.</span></h2>
           <p>Comparte gastos y salda cuentas a vuestra manera. Elegid entre dinero, comida, bebidas, favores y otras recompensas.</p>
@@ -446,7 +449,7 @@ function DebtDetail({ debt, update, busy, shareInvitation }: {
   const stages = ["Propuesta", "Aceptada", "Saldada"];
   const progress = stages.indexOf(debt.stage);
   const inviteToken = debt.shared?.invite;
-  const inviteUrl = inviteToken ? new URL(`/?invite=${inviteToken}`, window.location.origin).href : "";
+  const inviteUrl = inviteToken ? invitationUrl(inviteToken, window.location.origin).href : "";
   return <>
     <h2 id="dialog-title">{debt.title}</h2>
     <p className="dialog-description">{debt.direction === "owe" ? `Le debes a ${debt.friend}` : `${debt.friend} te debe`} <strong>{euros(debt.amount)}</strong></p>

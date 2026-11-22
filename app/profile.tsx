@@ -53,9 +53,14 @@ function authErrorMessage(error: AuthError) {
   }
 }
 
-export function ProfileDialog({ profile }: { profile: ReturnType<typeof useProfile> }) {
+type ProfileMode = "profile" | "login" | "register";
+
+export function ProfileDialog({ profile, initialMode = "profile" }: {
+  profile: ReturnType<typeof useProfile>;
+  initialMode?: ProfileMode;
+}) {
   const { client, user, name, loading, saveDemoName } = profile;
-  const [mode, setMode] = useState<"profile" | "login" | "register">("profile");
+  const [mode, setMode] = useState<ProfileMode>(initialMode);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; error?: boolean }>();
   const showProfile = Boolean(user) || mode === "profile";
