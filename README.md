@@ -41,3 +41,13 @@ npm run build
 4. Pulsa **Deploy**. Cuando aparezca **Ready**, abre el proyecto y copia su dominio de producción en **Settings → Domains**, o pulsa **Visit** en el despliegue de producción. Abre el enlace HTTPS que termina en `.vercel.app` desde el ordenador o el móvil.
 
 Vercel vuelve a desplegar la aplicación cuando subes cambios a la rama de producción `main`. Usa el mismo dominio de producción para conservar los datos guardados en ese navegador. Cada navegador y cada dominio mantienen sus propios datos, así que el móvil y el ordenador comienzan con datos de ejemplo por separado.
+
+## Configurar Supabase
+
+Copia `.env.example` a `.env.local`. En el panel de tu proyecto Supabase, abre **Connect** y rellena `NEXT_PUBLIC_SUPABASE_URL` con la URL del proyecto y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` con la clave **Publishable**. Si despliegas en Vercel, añade las mismas variables en **Settings → Environment Variables** y vuelve a desplegar.
+
+Estas variables son públicas. Guarda las claves secretas y de tipo `service_role` fuera del cliente. Git ignora `.env.local`.
+
+La integración prepara los clientes de navegador y servidor y la renovación de sesiones mediante el proxy de Next.js. Si falta alguna de las dos variables, el proxy deja pasar las solicitudes y los clientes devuelven `null`. La demo sigue usando el almacenamiento local con o sin Supabase. Desde el avatar puedes cambiar el nombre de la demo. Con Supabase configurado, también puedes crear una cuenta, confirmar el correo, iniciar sesión y editar el nombre de tu cuenta. Las deudas y los grupos de la demo siguen siendo locales al navegador.
+
+En **Authentication → URL Configuration** de Supabase, configura **Site URL** con el dominio HTTPS de PACTA. Añade `https://TU_DOMINIO/auth/callback` a **Redirect URLs**. Para desarrollo local, añade también `http://localhost:3000/auth/callback`. El enlace de confirmación debe abrirse en el mismo navegador donde empezaste el registro.

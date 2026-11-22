@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { euros, groups, sample, type Debt, type Method } from "../lib/demo";
 
+import { ProfileDialog, useProfile } from "./profile";
+
 const nav = [
   { label: "Inicio", icon: LayoutGrid },
   { label: "Grupos", icon: UsersRound },
@@ -28,11 +30,14 @@ export default function Home() {
   const [view, setView] = useState<View>("Inicio");
   const [debts, setDebts] = useState<Debt[]>(sample);
   const [ready, setReady] = useState(false);
-  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState<"Todo" | "Pendientes" | "Saldadas">("Todo");
   const [message, setMessage] = useState("");
+  const profile = useProfile();
+  const firstName = profile.name.split(/\s+/, 1)[0];
+  const initial = Array.from(profile.name)[0]?.toLocaleUpperCase("es");
   const active = debts.find((debt) => debt.id === selected);
   const proposals = debts.filter((debt) => debt.stage === "Propuesta");
   const owed = debts.reduce((sum, debt) => sum + (debt.stage !== "Saldada" && debt.direction === "owed" ? Math.round(debt.amount * 100) : 0), 0) / 100;
@@ -44,6 +49,15 @@ export default function Home() {
       if (saved) setDebts(JSON.parse(saved));
     } catch { /* Fall back to demo data if storage is unavailable. */ }
     setReady(true);
+    const url = new URL(window.location.href);
+    const auth = url.searchParams.get("auth");
+    if (auth === "confirmed" || auth === "failed") {
+      setMessage(auth === "confirmed"
+        ? "Correo confirmado. Tu sesión está iniciada."
+        : "El enlace no pudo confirmarse. Abre el correo en el navegador donde te registraste y comprueba si ha caducado.");
+      url.searchParams.delete("auth");
+      window.history.replaceState(window.history.state, "", url);
+    }
   }, []);
 
   useEffect(() => {
@@ -142,7 +156,7 @@ export default function Home() {
         </nav>
         <div className="sidebar-bottom">
           <button className="help" onClick={() => setDialog("welcome")}><CircleHelp size={19} /> Sobre Pacta</button>
-          <div className="profile"><span className="avatar">A</span><span><strong>Álex García</strong><small>Mi espacio personal</small></span></div>
+          <button className="profile" onClick={() => setDialog("profile")} aria-label="Mi perfil"><span className="avatar">{initial}</span><span><strong>{profile.name}</strong><small>Mi espacio personal</small></span></button>
         </div>
       </aside>
 
@@ -152,14 +166,14 @@ export default function Home() {
           <span className="top-label">Mi espacio</span>
           <div className="top-actions">
             <button className="icon-button notification" aria-label="Notificaciones" onClick={() => setDialog("notifications")}><Bell size={19} />{proposals.length > 0 && <i />}</button>
-            <button className="avatar top-avatar" onClick={() => setDialog("welcome")} aria-label="Álex García">A</button>
+            <button className="avatar top-avatar" onClick={() => setDialog("profile")} aria-label="Mi perfil">{initial}</button>
           </div>
         </header>
 
         <div className="content">
           {view === "Inicio" ? <>
             <div className="page-heading">
-              <div><h1>¡Hola, Álex! <span className="wave">👋</span></h1><p>Así van vuestras cuentas entre amigos.</p></div>
+              <div><h1>¡Hola, {firstName}! <span className="wave">👋</span></h1><p>Así van vuestras cuentas entre amigos.</p></div>
               <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button>
             </div>
 
@@ -194,7 +208,7 @@ export default function Home() {
             <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
             {group ? <>
               <div className="members">{groups.find((item) => item.name === group)?.members.map((member, index) =>
-                <span key={member}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member[0]}</span>{member}</span>
+                <span key={member}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member === "Álex" ? initial : member[0]}</span>{member === "Álex" ? firstName : member}</span>
               )}</div>
               <div className="section-heading"><h2>Movimientos del grupo</h2></div>
               {debtList(visibleDebts)}
@@ -218,7 +232,7 @@ export default function Home() {
       </nav>
 
       {(dialog || active) && <Modal close={() => { setDialog(null); setSelected(null); }}>
-        {dialog === "welcome" ? <div className="welcome">
+        {dialog === "profile" ? <ProfileDialog profile={profile} /> : dialog === "welcome" ? <div className="welcome">
           <span className="brand-mark"><Handshake size={39} /></span>
           <h2 id="dialog-title">Bienvenido a PACTA<span className="brand-dot">.</span></h2>
           <p>Comparte gastos y salda cuentas a vuestra manera. Elegid entre dinero, comida, bebidas, favores y otras recompensas.</p>
