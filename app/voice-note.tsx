@@ -12,9 +12,10 @@ export type VoiceRecording = { id: string; blob: Blob; extension: string };
 type Phase = "idle" | "requesting" | "recording" | "ready";
 type Client = NonNullable<ReturnType<typeof createClient>>;
 
-export function VoiceComposer({ sending, send }: {
+export function VoiceComposer({ sending, send, onRecordingChange }: {
   sending: boolean;
   send: (recording: VoiceRecording) => Promise<boolean>;
+  onRecordingChange: (recording: boolean) => void;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [seconds, setSeconds] = useState(0);
@@ -26,6 +27,10 @@ export function VoiceComposer({ sending, send }: {
   const objectUrl = useRef("");
   const active = useRef(false);
   const timer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    onRecordingChange(phase === "recording");
+  }, [onRecordingChange, phase]);
 
   useEffect(() => {
     active.current = true;

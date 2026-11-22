@@ -28,6 +28,8 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [recordingVoice, setRecordingVoice] = useState(false);
+  const [sendingVoice, setSendingVoice] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [sendError, setSendError] = useState("");
   const inFlight = useRef(false);
@@ -87,7 +89,7 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
     }
   }, [client, isGroup, onChange, table, target.id, trackRead, userId]);
 
-  const { typing, reportTyping, stopTyping } = useChatLive(client, userId, target, () => {
+  const { activity, reportTyping, stopTyping } = useChatLive(client, userId, target, recordingVoice || sendingVoice, () => {
     if (!document.hidden) void refresh();
   });
 
@@ -150,6 +152,7 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
   async function sendAttachment(file: VoiceRecording | PhotoAttachment, kind: "audio" | "photo") {
     if (sending) return false;
     setSending(true);
+    if (kind === "audio") setSendingVoice(true);
     setSendError("");
     const prefix = isGroup ? `groups/${target.id}/${userId}` : `${userId}/${target.id}`;
     const path = `${prefix}/${file.id}.${file.extension}`;
@@ -168,6 +171,7 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
       return false;
     } finally {
       setSending(false);
+      if (kind === "audio") setSendingVoice(false);
     }
   }
 
@@ -205,8 +209,8 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
       </div>)}
     </div>
     <div className="chat-typing" role="status">
-      {typing && <><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span>
-        <span className="sr-only">{isGroup ? "Alguien está escribiendo" : `${target.name} está escribiendo`}</span></>}
+      {activity && <><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span>
+        <span className="sr-only">{isGroup ? "Alguien" : target.name} {activity === "audio" ? "está preparando un audio" : "está escribiendo"}</span></>}
     </div>
     <form className="form" onSubmit={send}>
       <label>Mensaje<textarea ref={textField} value={draft} onBlur={stopTyping} onChange={(event) => {
@@ -217,7 +221,7 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
       <div className="chat-tools">
         <button className="icon-button" type="button" disabled={sending} aria-label="Emojis" title="Emojis"
           aria-expanded={emojiOpen} onClick={() => setEmojiOpen(!emojiOpen)}><Smile size={19} /></button>
-        <VoiceComposer sending={sending} send={(recording) => sendAttachment(recording, "audio")} />
+        <VoiceComposer sending={sending} onRecordingChange={setRecordingVoice} send={(recording) => sendAttachment(recording, "audio")} />
         <PhotoComposer sending={sending} send={(photo) => sendAttachment(photo, "photo")} />
       </div>
       {emojiOpen && <div className="emoji-picker" role="group" aria-label="Seleccionar emoji">
