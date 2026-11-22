@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { isAuthError, type AuthError, type User } from "@supabase/supabase-js";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { isAuthError, isAuthRetryableFetchError, type AuthError, type User } from "@supabase/supabase-js";
 import { createClient } from "../utils/supabase/client";
 
 const defaultName = "Álex García";
@@ -43,11 +43,17 @@ export function useProfile() {
 }
 
 function authErrorMessage(error: AuthError) {
+  if (isAuthRetryableFetchError(error)) {
+    return "No pudimos conectar con el servicio de cuentas. Comprueba tu conexión y vuelve a intentarlo.";
+  }
   switch (error.code) {
     case "invalid_credentials": return "El correo o la contraseña no coinciden.";
-    case "email_not_confirmed": return "Confirma tu correo antes de iniciar sesión.";
+    case "email_not_confirmed": return "Confirma tu correo para entrar. Si no te llegó, pulsa Reenviar confirmación.";
     case "user_already_exists": return "Ya existe una cuenta con ese correo. Prueba a iniciar sesión.";
     case "weak_password": return "Elige una contraseña más segura.";
+    case "email_address_not_authorized": return "El servicio de correo todavía no puede enviar confirmaciones a esta dirección. Contacta con quien administra PACTA.";
+    case "signup_disabled": return "El registro de cuentas está desactivado en este momento.";
+    case "over_request_rate_limit":
     case "over_email_send_rate_limit": return "Se han enviado demasiados correos. Vuelve a intentarlo más tarde.";
     default: return "No se pudo completar la operación. Inténtalo de nuevo en unos minutos.";
   }
@@ -62,10 +68,28 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
   const { client, user, name, loading, saveDemoName } = profile;
   const [mode, setMode] = useState<ProfileMode>(initialMode);
   const [busy, setBusy] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
+  const [resendCoolingDown, setResendCoolingDown] = useState(false);
+  const [sessionDelayed, setSessionDelayed] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const [feedback, setFeedback] = useState<{ text: string; error?: boolean }>();
   const showProfile = Boolean(user) || mode === "profile";
 
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => setSessionDelayed(true), 12_000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  useEffect(() => {
+    if (!resendCoolingDown) return;
+    const timer = setTimeout(() => setResendCoolingDown(false), 60_000);
+    return () => clearTimeout(timer);
+  }, [resendCoolingDown]);
+
   function switchMode(value: typeof mode) {
+    const input = formRef.current?.elements.namedItem("email");
+    if (input instanceof HTMLInputElement) setEmailDraft(input.value.trim());
     setMode(value);
     setFeedback(undefined);
   }
@@ -96,6 +120,7 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
 
       if (!client) return;
       const email = String(form.get("email")).trim();
+      setEmailDraft(email);
       const password = String(form.get("password"));
 
       if (mode === "register") {
@@ -109,7 +134,10 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
         });
         if (error) throw error;
         setMode(data.session ? "profile" : "login");
-        setFeedback({ text: data.session ? "Cuenta creada." : "Revisa tu correo para confirmar la cuenta." });
+        if (!data.session) setResendCoolingDown(true);
+        setFeedback({ text: data.session
+          ? "Cuenta creada."
+          : "Revisa tu correo y la carpeta de spam. Si ya tenías cuenta, puedes iniciar sesión o reenviar la confirmación." });
       } else {
         const { error } = await client.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -121,6 +149,34 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
         text: isAuthError(error)
           ? authErrorMessage(error)
           : "No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.",
+        error: true,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendConfirmation() {
+    if (!client || busy || resendCoolingDown) return;
+    const input = formRef.current?.elements.namedItem("email");
+    if (!(input instanceof HTMLInputElement) || !input.reportValidity()) return;
+    const email = input.value.trim();
+    setEmailDraft(email);
+    setBusy(true);
+    setFeedback(undefined);
+
+    try {
+      const { error } = await client.auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo: new URL("/auth/callback", window.location.origin).href },
+      });
+      if (error) throw error;
+      setResendCoolingDown(true);
+      setFeedback({ text: "Si la cuenta está pendiente de confirmar, recibirás un enlace. Revisa también spam." });
+    } catch (error) {
+      setFeedback({
+        text: isAuthError(error) ? authErrorMessage(error) : "No pudimos solicitar el correo. Inténtalo de nuevo.",
         error: true,
       });
     } finally {
@@ -148,13 +204,16 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
     <p className="dialog-description">{user ? user.email : showProfile
       ? "Personaliza tu nombre en este navegador."
       : "Usa tu correo y contraseña para acceder a tu perfil."}</p>
-    {loading ? <p role="status">Cargando perfil…</p> : <>
-      <form className="form" key={showProfile ? user?.id ?? "demo" : mode} onSubmit={submit}>
+    {loading ? (sessionDelayed ? <>
+      <p role="status">La sesión tarda más de lo normal en cargar.</p>
+      <div className="profile-actions"><button className="secondary" onClick={() => window.location.reload()}>Volver a intentar</button></div>
+    </> : <p role="status">Cargando perfil…</p>) : <>
+      <form ref={formRef} className="form" key={showProfile ? user?.id ?? "demo" : mode} onSubmit={submit}>
         {(showProfile || mode === "register") && <label>Nombre
           <input name="name" autoComplete="name" defaultValue={showProfile ? name : ""} required maxLength={50} />
         </label>}
         {!showProfile && <>
-          <label>Correo electrónico<input name="email" type="email" autoComplete="email" required /></label>
+          <label>Correo electrónico<input name="email" type="email" autoComplete="email" defaultValue={emailDraft} required /></label>
           <label>Contraseña<input name="password" type="password"
             autoComplete={mode === "register" ? "new-password" : "current-password"}
             minLength={mode === "register" ? 8 : undefined} required /></label>
@@ -166,6 +225,9 @@ export function ProfileDialog({ profile, initialMode = "profile" }: {
       <div className="profile-actions">
         {user ? <button className="secondary" disabled={busy} onClick={signOut}>Cerrar sesión</button>
           : client ? <>
+            {mode === "login" && <button className="secondary" disabled={busy || resendCoolingDown} onClick={resendConfirmation}>
+              {resendCoolingDown ? "Espera un minuto para reenviar" : "Reenviar confirmación"}
+            </button>}
             {mode !== "login" && <button className="secondary" disabled={busy} onClick={() => switchMode("login")}>Iniciar sesión</button>}
             {mode !== "register" && <button className="secondary" disabled={busy} onClick={() => switchMode("register")}>Crear cuenta</button>}
             {!showProfile && <button className="secondary" disabled={busy} onClick={() => switchMode("profile")}>Volver a mi perfil</button>}

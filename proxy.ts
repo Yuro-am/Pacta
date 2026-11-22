@@ -6,5 +6,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // Public pages use the browser session. Only server APIs need session refresh here.
+  matcher: ["/api/:path*"],
 };

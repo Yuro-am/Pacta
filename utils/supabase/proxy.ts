@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { fetchWithTimeout } from "./fetch";
 import { getSupabaseConfig } from "./config";
 
 export async function updateSession(request: NextRequest) {
@@ -8,6 +9,7 @@ export async function updateSession(request: NextRequest) {
   if (!config) return response;
 
   const supabase = createServerClient(config.url, config.publishableKey, {
+    global: { fetch: fetchWithTimeout },
     cookies: {
       getAll() {
         return request.cookies.getAll();

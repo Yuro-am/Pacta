@@ -1,7 +1,10 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { fetchWithTimeout } from "./fetch";
 import { getSupabaseConfig } from "./config";
 
 export function createClient() {
   const config = getSupabaseConfig();
-  return config ? createBrowserClient(config.url, config.publishableKey) : null;
+  return config ? createBrowserClient(config.url, config.publishableKey, {
+    global: { fetch: fetchWithTimeout },
+  }) : null;
 }

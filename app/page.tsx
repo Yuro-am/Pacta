@@ -106,11 +106,16 @@ export default function Home() {
   useEffect(() => {
     if (!client || !userId) return;
     let active = true;
+    let inFlight = false;
+    const controller = new AbortController();
 
     async function refresh() {
-      if (!client || !userId) return;
+      if (!client || !userId || inFlight || document.hidden) return;
+      inFlight = true;
       const revision = ++sharedRevision.current;
-      const { data, error } = await client.from("shared_debts").select("*").order("created_at", { ascending: false });
+      const { data, error } = await client.from("shared_debts").select("*")
+        .order("created_at", { ascending: false }).abortSignal(controller.signal);
+      inFlight = false;
       if (!active || revision !== sharedRevision.current) return;
       setSharedError(error ? { actor: userId, missing: ["42P01", "PGRST205"].includes(error.code) } : null);
       if (data) {
@@ -120,11 +125,12 @@ export default function Home() {
 
     void refresh();
     const timer = window.setInterval(refresh, 15000);
-    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       active = false;
+      controller.abort();
       window.clearInterval(timer);
-      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [client, userId]);
 

@@ -48,9 +48,11 @@ Copia `.env.example` a `.env.local`. En el panel de tu proyecto Supabase, abre *
 
 Estas variables son públicas. Guarda las claves secretas y de tipo `service_role` fuera del cliente. Git ignora `.env.local`.
 
-La integración prepara los clientes de navegador y servidor y la renovación de sesiones mediante el proxy de Next.js. Si falta alguna de las dos variables, el proxy deja pasar las solicitudes y los clientes devuelven `null`. La demo sigue usando el almacenamiento local con o sin Supabase. Desde el avatar puedes cambiar el nombre de la demo. Con Supabase configurado, también puedes crear una cuenta, confirmar el correo, iniciar sesión y editar el nombre de tu cuenta. La demo sin cuenta y sus grupos siguen guardándose en el navegador.
+La integración prepara los clientes de navegador y servidor. La sesión de la interfaz se renueva en el navegador y el proxy queda reservado para las rutas de API. Si falta alguna de las dos variables, el proxy deja pasar las solicitudes y los clientes devuelven `null`. La demo sigue usando el almacenamiento local con o sin Supabase. Desde el avatar puedes cambiar el nombre de la demo. Con Supabase configurado, también puedes crear una cuenta, confirmar el correo, iniciar sesión y editar el nombre de tu cuenta. La demo sin cuenta y sus grupos siguen guardándose en el navegador.
 
 En **Authentication → URL Configuration** de Supabase, configura **Site URL** con el dominio HTTPS de PACTA. Añade `https://TU_DOMINIO/auth/callback` a **Redirect URLs**. Para desarrollo local, añade también `http://localhost:3000/auth/callback`. El enlace de confirmación debe abrirse en el mismo navegador donde empezaste el registro.
+
+Si el correo no llega, revisa spam y usa **Iniciar sesión → Reenviar confirmación**. El servicio de correo predeterminado de Supabase está limitado a las direcciones del equipo. Para que otras personas reciban las confirmaciones, configura un proveedor SMTP propio en Supabase. [Configurar SMTP en Supabase](https://supabase.com/docs/guides/auth/auth-smtp)
 
 ## Activar las deudas compartidas
 

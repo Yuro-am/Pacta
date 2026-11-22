@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import type { cookies } from "next/headers";
+import { fetchWithTimeout } from "./fetch";
 import { getSupabaseConfig } from "./config";
 
 export function createClient(cookieStore: Awaited<ReturnType<typeof cookies>>) {
@@ -7,6 +8,7 @@ export function createClient(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   if (!config) return null;
 
   return createServerClient(config.url, config.publishableKey, {
+    global: { fetch: fetchWithTimeout },
     cookies: {
       getAll() {
         return cookieStore.getAll();
