@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight,
   CircleHelp, Coffee, Gift, HandHeart, Handshake, House, LayoutGrid, List, Pizza,
@@ -15,6 +15,7 @@ import { DebtNoticeList, MessageList } from "./inbox";
 import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
 import { GroupInvite, SocialPanel } from "./social";
+import { NewDebtForm, type GroupSplit } from "./new-debt";
 import { ProfileDialog, useProfile } from "./profile";
 
 const nav = [
@@ -83,8 +84,8 @@ export default function Home() {
   const social = socialState?.actor === userId ? socialState?.data : undefined;
   const realGroup = social?.groups.find((item) => item.id === group && item.accepted);
   const groupName = realGroup?.name ?? (!userId ? groups.find((item) => item.name === group)?.name : undefined);
-  const friendsForDebt = social?.friends.filter((friend) => friend.accepted &&
-    (!realGroup || realGroup.members.some((member) => member.id === friend.id))) ?? [];
+  const friendsForDebt = social?.friends.filter((friend) => friend.accepted) ?? [];
+  const groupsForDebt = social?.groups.filter((item) => item.accepted) ?? [];
   const debts = usingShared ? (shared?.actor === userId ? shared?.debts ?? [] : []) : localDebts;
   const firstName = profile.name.split(/\s+/, 1)[0];
   const initial = Array.from(profile.name)[0]?.toLocaleUpperCase("es");
@@ -304,34 +305,49 @@ export default function Home() {
     if (next === "Grupos") void refreshSocial();
   }
 
-  async function addDebt(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy || profile.loading) return;
-    const form = new FormData(event.currentTarget);
+  async function addDebt(form: FormData, split?: GroupSplit) {
+    if (busy || profile.loading) return "Espera a que termine la operación actual.";
     const title = String(form.get("title")).trim();
     const friend = String(form.get("friend") ?? "").trim();
     const friendId = String(form.get("friendId") ?? "");
     const onlineFriend = usingShared && friendId;
     const amount = Number(form.get("amount"));
     const direction = form.get("direction") === "owed" ? "owed" : "owe";
-    if (!title || (!friend && !onlineFriend) || !Number.isFinite(amount) || amount <= 0) {
-      setMessage("Selecciona un amigo o escribe su nombre.");
-      return;
-    }
+    if (!title || !Number.isFinite(amount) || amount < 0.01 || amount > 999999) return "Introduce un concepto y un importe válido.";
+    if (!split && !friend && !onlineFriend) return "Selecciona un amigo o escribe su nombre.";
+    if (split && (!usingShared || !userId || !client)) return "Inicia sesión para repartir entre los miembros del grupo.";
 
     if (usingShared && userId && client) {
       setBusy(true);
       try {
         const values = { p_title: title, p_owner_owes: direction === "owe", p_cents: Math.round(amount * 100) };
+        if (split) {
+          const { data, error } = await client.rpc("pacta_split_group_debt", {
+            ...values, p_group: split.groupId, p_members: split.members,
+            p_include_self: split.includeSelf, p_split_id: split.id,
+          });
+          if (error?.code === "PGRST202") return "El reparto por grupos aún no está activado en Supabase.";
+          if (error?.message === "Group members changed") {
+            void refreshSocial();
+            return "Han cambiado los miembros del grupo. Revisa el reparto actualizado antes de guardarlo.";
+          }
+          if (error) throw error;
+          for (const row of data as SharedDebtRow[]) storeSharedDebt(row, userId);
+          setDialog(null);
+          showGroup(split.groupId);
+          setMessage("Reparto registrado para el grupo");
+          return;
+        }
+
+        const friendGroup = realGroup?.members.some((member) => member.id === friendId) ? realGroup.id : null;
         const { data, error } = onlineFriend
-          ? await client.rpc("pacta_create_friend_debt", { ...values, p_friend: friendId, p_group: realGroup?.id ?? null })
+          ? await client.rpc("pacta_create_friend_debt", { ...values, p_friend: friendId, p_group: friendGroup })
           : await client.rpc("pacta_create_debt", { ...values, p_guest: friend });
         if (error) throw error;
         storeSharedDebt(data, userId);
         setSelected(data.id);
       } catch {
-        setMessage("No se pudo guardar la deuda compartida.");
-        return;
+        return "No se pudo guardar la deuda compartida. Inténtalo de nuevo.";
       } finally {
         setBusy(false);
       }
@@ -458,6 +474,7 @@ export default function Home() {
           {nav.map(({ label, icon: Icon }) =>
             <button key={label} className={view === label ? "nav-active" : ""} onClick={() => navigate(label)} aria-current={view === label ? "page" : undefined}>
               <Icon size={19} />{label}
+              {label === "Grupos" && pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}
             </button>
           )}
         </nav>
@@ -560,7 +577,7 @@ export default function Home() {
 
       <nav className="bottom-nav" aria-label="Navegación móvil">
         <button onClick={() => navigate("Inicio")} aria-current={view === "Inicio" ? "page" : undefined} className={view === "Inicio" ? "bottom-active" : ""}><LayoutGrid size={21} /> Inicio</button>
-        <button onClick={() => navigate("Grupos")} aria-current={view === "Grupos" ? "page" : undefined} className={view === "Grupos" ? "bottom-active" : ""}><UsersRound size={21} /> Grupos</button>
+        <button onClick={() => navigate("Grupos")} aria-current={view === "Grupos" ? "page" : undefined} className={view === "Grupos" ? "bottom-active" : ""}><UsersRound size={21} /> Grupos{pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}</button>
         <button className="bottom-add" onClick={() => setDialog("new")}><span><Plus size={22} /></span> Añadir</button>
         <button onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
@@ -590,20 +607,8 @@ export default function Home() {
           <button className="primary" onClick={() => { setDialog(null); navigate("Inicio"); }}>Entrar a Pacta <ArrowRight size={18} /></button>
         </div> : dialog === "new" ? <>
           <h2 id="dialog-title">Nueva deuda</h2><p className="dialog-description">Añade un gasto compartido o algo que quedó pendiente.</p>
-          <form className="form" onSubmit={addDebt}>
-            <label>Concepto<input name="title" placeholder="Ej. Cena del viernes" required maxLength={70} /></label>
-            {friendsForDebt.length > 0 && usingShared && <label>Amigo de PACTA<select name="friendId" defaultValue="" required={Boolean(realGroup)}>
-              <option value="">{realGroup ? "Selecciona un miembro" : "Selecciona un amigo o usa un enlace"}</option>
-              {friendsForDebt.map((friend) => <option key={friend.id} value={friend.id}>{friend.name}</option>)}
-            </select></label>}
-            {!realGroup && <label>{friendsForDebt.length && usingShared ? "Nombre si vas a enviar un enlace" : "Amigo o amiga"}
-              <input name="friend" placeholder="Ej. Ana" required={!usingShared || !friendsForDebt.length} maxLength={40} /></label>}
-            {realGroup && !friendsForDebt.length && <p>Cuando un amigo acepte la invitación al grupo, podrás registrar una deuda con él.</p>}
-            <label>Importe (€)<input name="amount" type="number" min="0.01" max="999999" step="0.01" placeholder="0,00" required /></label>
-            <label>Quién debe<select name="direction"><option value="owe">Yo debo</option><option value="owed">Me deben</option></select></label>
-            {!usingShared && <label>Grupo<select name="group" defaultValue={group || ""}><option value="">Sin grupo</option>{groups.map((item) => <option key={item.name}>{item.name}</option>)}</select></label>}
-            <button className="primary form-submit" type="submit" disabled={busy || profile.loading || Boolean(realGroup && !friendsForDebt.length)}><Plus size={18} /> Registrar deuda</button>
-          </form>
+          <NewDebtForm friends={friendsForDebt} onlineGroups={groupsForDebt} userId={userId}
+            initialGroup={group} usingShared={usingShared} disabled={busy || profile.loading} save={addDebt} />
         </> : dialog === "notifications" ? <>
           <h2 id="dialog-title">Notificaciones</h2>
           <p className="dialog-description">Mensajes, solicitudes y cambios en tus deudas.</p>
@@ -618,7 +623,7 @@ export default function Home() {
           {pendingSocial > 0 && <button className="secondary invitation-button" onClick={() => {
             setDialog(null);
             navigate("Grupos");
-          }}>Ver solicitudes de amigos y grupos</button>}
+          }}>Ver solicitudes de amigos y grupos ({pendingSocial})</button>}
           {proposals.length > 0 && <div className="debt-list">{proposals.map((debt) =>
             <button className="debt-row" key={debt.id} onClick={() => { setDialog(null); setSelected(debt.id); }}>
               <span className="tile lilac"><Bell size={19} /></span><span className="row-copy"><strong>{debt.title}</strong><small>{debt.friend} · {debt.offer?.method}</small></span><ChevronRight size={16} />

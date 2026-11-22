@@ -207,3 +207,12 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 850; letter-spacing: -.06
   .top-actions { gap: 9px; }
   .message-menu { right: -45px; }
 }
+
+.form .split-checkbox { display: flex; align-items: center; gap: 8px; }
+.form .split-checkbox input { width: 17px; height: 17px; accent-color: var(--purple); }
+.split-preview { display: grid; padding: 12px; gap: 6px; border-radius: 11px; background: #f5efff; }
+.split-preview > div { display: flex; justify-content: space-between; gap: 12px; }
+.group-request-count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; background: var(--purple); color: white; font-size: 10px; line-height: 1; }
+.side-nav .group-request-count { margin-left: auto; }
+.bottom-nav button:has(.group-request-count) { position: relative; }
+.bottom-nav .group-request-count { position: absolute; top: 0; left: calc(50% + 8px); }

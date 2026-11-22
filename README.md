@@ -91,3 +91,7 @@ Ejecuta [202611220005_inbox_and_notifications.sql](supabase/migrations/202611220
 Ejecuta [202611220006_usernames.sql](supabase/migrations/202611220006_usernames.sql) en Supabase después de la migración de Amigos y Grupos. Las cuentas existentes eligen su nombre de usuario en **Mi perfil → Guardar perfil**. Las cuentas nuevas lo eligen al registrarse. Los nombres son únicos y las solicitudes de amistad usan el nombre de usuario exacto. El correo se sigue usando para iniciar sesión.
 
 En Supabase, abre **Authentication → Sign In / Providers → Email**, desactiva **Confirm email** y guarda. Las cuentas nuevas podrán iniciar sesión al registrarse. Si una cuenta creada antes sigue pendiente, comprueba su estado en **Authentication → Users**. Este ajuste permite registrar una cuenta sin demostrar acceso al buzón, por eso la búsqueda de amigos usa el nombre de usuario.
+
+## Repartir una deuda entre todo un grupo
+
+Ejecuta [202611220007_group_debt_split.sql](supabase/migrations/202611220007_group_debt_split.sql) en Supabase después de activar Amigos y Grupos. En **Nueva deuda**, selecciona **Registrar para → Todo un grupo**, elige el grupo e introduce el importe total. PACTA muestra cuánto corresponde a cada miembro que ya aceptó formar parte del grupo. Si el importe incluye tu parte, deja marcada **Incluir mi parte en el reparto**. Cada uno de los demás miembros recibe su deuda en su cuenta. El contador de **Grupos** muestra las solicitudes de amistad y las invitaciones de grupo pendientes.
