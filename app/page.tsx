@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight,
   CircleHelp, Coffee, Gift, HandHeart, Handshake, House, LayoutGrid, List, Pizza,
-  Plane, Plus, ReceiptText, Sparkles, UsersRound, Wallet, X,
+  Plane, Plus, ReceiptText, Send, Sparkles, UsersRound, Wallet, X,
 } from "lucide-react";
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
@@ -48,6 +48,8 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [dialog, setDialog] = useState<"new" | "welcome" | "notifications" | "profile" | "invite" | "register" | "messages" | null>(null);
+  const messageArea = useRef<HTMLDivElement>(null);
+  const messageButton = useRef<HTMLButtonElement>(null);
   const [chatFriend, setChatFriend] = useState<Person | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [group, setGroup] = useState<string | null>(null);
@@ -57,6 +59,24 @@ export default function Home() {
   const { client } = profile;
   const userId = profile.user?.id;
   const { inbox, refresh: refreshInbox } = useInbox(client, userId);
+
+  useEffect(() => {
+    if (dialog !== "messages") return;
+    function dismissOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !messageArea.current?.contains(event.target)) setDialog(null);
+    }
+    function dismissOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setDialog(null);
+      messageButton.current?.focus();
+    }
+    document.addEventListener("pointerdown", dismissOutside);
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [dialog]);
   useEffect(() => { setChatFriend(null); }, [userId]);
   const sharedUnavailable = sharedError?.actor === userId && sharedError?.missing;
   const usingShared = Boolean(userId && !sharedUnavailable);
@@ -455,6 +475,27 @@ export default function Home() {
             <button className="icon-button notification" aria-label={unread ? `Notificaciones (${unread} sin leer)` : "Notificaciones"} onClick={() => {
               setDialog("notifications"); void refreshInbox();
             }}><Bell size={19} />{unread > 0 && <span className="notification-count">{unread > 99 ? "99+" : unread}</span>}</button>
+            {userId && <div className="message-area" ref={messageArea}>
+              <button ref={messageButton} className="icon-button notification" title="Mensajes"
+                aria-label={inbox?.unread_messages ? `Mensajes (${inbox.unread_messages} sin leer)` : "Mensajes"}
+                aria-expanded={dialog === "messages"} aria-controls="message-menu"
+                onClick={() => {
+                  setDialog(dialog === "messages" ? null : "messages");
+                  if (dialog !== "messages") void refreshInbox();
+                }}>
+                <Send size={18} />
+                {Boolean(inbox?.unread_messages) && <span className="notification-count" aria-hidden="true">
+                  {(inbox?.unread_messages ?? 0) > 99 ? "99+" : inbox?.unread_messages}
+                </span>}
+              </button>
+              {dialog === "messages" && <section id="message-menu" className="message-menu" aria-labelledby="message-menu-title">
+                <div className="section-heading">
+                  <h2 id="message-menu-title">Mensajes</h2>
+                  <button onClick={() => { setDialog(null); navigate("Grupos"); }}>Nuevo mensaje</button>
+                </div>
+                <MessageList conversations={inbox?.conversations ?? []} onOpen={openChat} />
+              </section>}
+            </div>}
             <button className="avatar top-avatar" onClick={() => setDialog("profile")} aria-label="Mi perfil">{initial}</button>
           </div>
         </header>
@@ -479,20 +520,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section className="tip">
-              <span className="tip-icon"><Sparkles size={21} /></span>
-              <div><strong>Hay más de una forma de saldar cuentas</strong><p>Un café, una pizza o un favor. Vosotros decidís.</p></div>
-              <button onClick={() => { const pending = debts.find((debt) => debt.stage !== "Saldada"); if (pending) setSelected(pending.id); else setDialog("welcome"); }}>Cómo funciona <ArrowRight size={16} /></button>
-            </section>
-
-            {userId && <section className="home-messages">
-              <div className="section-heading"><h2>Mensajes{Boolean(inbox?.unread_messages) && <span className="inbox-count">{inbox?.unread_messages}</span>}</h2>
-                <button onClick={() => { setDialog("messages"); void refreshInbox(); }}>Ver mensajes <ArrowRight size={15} /></button>
-              </div>
-              {inbox ? <MessageList conversations={inbox.conversations.slice(0, 3)} onOpen={openChat} />
-                : <div className="debt-list"><p className="empty">Abre un chat desde Grupos → Mis amigos.</p></div>}
-            </section>}
-            <div className="dashboard-grid">
+            <div className="dashboard-grid home-dashboard">
               <section>
                 <div className="section-heading"><h2>Actividad reciente</h2><button onClick={() => navigate("Actividad")}>Ver todo <ArrowRight size={15} /></button></div>
                 {debtList(debts.slice(0, 4))}
@@ -537,7 +565,7 @@ export default function Home() {
         <button onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
 
-      {(dialog || active || (chatFriend && client && userId)) && <Modal close={() => {
+      {((dialog && dialog !== "messages") || active || (chatFriend && client && userId)) && <Modal close={() => {
         setDialog(null); setSelected(null); setChatFriend(null);
       }}>
         {chatFriend && client && userId ? <ChatDialog key={`${userId}:${chatFriend.id}`} client={client} userId={userId} friend={chatFriend} trackRead={Boolean(inbox)} onChange={refreshInbox} />
@@ -576,13 +604,6 @@ export default function Home() {
             {!usingShared && <label>Grupo<select name="group" defaultValue={group || ""}><option value="">Sin grupo</option>{groups.map((item) => <option key={item.name}>{item.name}</option>)}</select></label>}
             <button className="primary form-submit" type="submit" disabled={busy || profile.loading || Boolean(realGroup && !friendsForDebt.length)}><Plus size={18} /> Registrar deuda</button>
           </form>
-        </> : dialog === "messages" ? <>
-          <h2 id="dialog-title">Mensajes</h2>
-          <p className="dialog-description">Tus conversaciones recientes.</p>
-          <button className="secondary invitation-button" onClick={() => {
-            setDialog(null); navigate("Grupos");
-          }}>Nuevo mensaje</button>
-          <MessageList conversations={inbox?.conversations ?? []} onOpen={openChat} />
         </> : dialog === "notifications" ? <>
           <h2 id="dialog-title">Notificaciones</h2>
           <p className="dialog-description">Mensajes, solicitudes y cambios en tus deudas.</p>

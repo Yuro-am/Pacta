@@ -84,4 +84,4 @@ Ejecuta [202611220004_friend_chat.sql](supabase/migrations/202611220004_friend_c
 
 ## Bandeja de mensajes y notificaciones
 
-Ejecuta [202611220005_inbox_and_notifications.sql](supabase/migrations/202611220005_inbox_and_notifications.sql) en Supabase después de activar el chat. **Inicio → Mensajes** muestra tus conversaciones recientes. La campana avisa de los mensajes sin leer, las deudas nuevas y los cambios en propuestas o pagos. Pulsa un aviso para abrir la conversación o la deuda. Los avisos aparecen dentro de PACTA mientras tienes la app abierta.
+Ejecuta [202611220005_inbox_and_notifications.sql](supabase/migrations/202611220005_inbox_and_notifications.sql) en Supabase después de activar el chat. El icono del avión de papel en la esquina superior derecha abre tus conversaciones recientes. La campana avisa de los mensajes sin leer, las deudas nuevas y los cambios en propuestas o pagos. Pulsa un aviso para abrir la conversación o la deuda. Los avisos aparecen dentro de PACTA mientras tienes la app abierta.
