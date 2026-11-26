@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, ImagePlus, Image as ImageIcon } from "lucide-react";
+import { Camera, ImagePlus, Image as ImageIcon, SwitchCamera, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { createClient } from "../utils/supabase/client";
 
@@ -13,13 +13,24 @@ export function PhotoComposer({ sending, send }: {
   send: (photo: PhotoAttachment) => Promise<boolean>;
 }) {
   const chooser = useRef<HTMLInputElement>(null);
+  const cameraDialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [facing, setFacing] = useState<"environment" | "user">("environment");
+  const [cameraError, setCameraError] = useState("");
+  const [switching, setSwitching] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [photo, setPhoto] = useState<PhotoAttachment | null>(null);
   const [preview, setPreview] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!cameraOpen) return;
+    const dialog = cameraDialog.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, [cameraOpen]);
 
   useEffect(() => {
     if (!photo) return;
@@ -38,14 +49,15 @@ export function PhotoComposer({ sending, send }: {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { facingMode: { ideal: "environment" } },
+          video: { facingMode: switching ? { exact: facing } : { ideal: facing } },
         });
         if (closed) stream.getTracks().forEach((track) => track.stop());
         else player.srcObject = stream;
       } catch {
         if (closed) return;
-        setCameraOpen(false);
-        setError("No se pudo abrir la cámara. Puedes adjuntar una foto.");
+        setCameraError(switching
+          ? "No se pudo abrir esa cámara. Puedes volver a cambiar."
+          : "No se pudo abrir la cámara. Revisa el permiso del navegador.");
       }
     }
 
@@ -55,7 +67,15 @@ export function PhotoComposer({ sending, send }: {
       stream?.getTracks().forEach((track) => track.stop());
       player.srcObject = null;
     };
-  }, [cameraOpen]);
+  }, [cameraOpen, facing, switching]);
+
+  function changeCamera() {
+    const current = (video.current?.srcObject as MediaStream | null)?.getVideoTracks()[0]?.getSettings().facingMode;
+    setCameraReady(false);
+    setCameraError("");
+    setSwitching(true);
+    setFacing((current ?? facing) === "user" ? "environment" : "user");
+  }
 
   async function takePhoto() {
     const player = video.current;
@@ -76,7 +96,7 @@ export function PhotoComposer({ sending, send }: {
       setPhoto({ id: crypto.randomUUID(), blob, extension: "jpg" });
       setCameraOpen(false);
     } catch {
-      setError("No se pudo tomar la foto. Inténtalo de nuevo.");
+      setCameraError("No se pudo tomar la foto. Inténtalo de nuevo.");
     } finally {
       setCapturing(false);
     }
@@ -94,24 +114,42 @@ export function PhotoComposer({ sending, send }: {
     setPhoto({ id: crypto.randomUUID(), blob: file, extension });
   }
 
-  return <div className={cameraOpen ? "photo-composer photo-composer-camera" : "photo-composer"}>
+  return <div className="photo-composer">
     <input className="sr-only" type="file" ref={chooser} tabIndex={-1} aria-label="Seleccionar archivo de foto"
       accept={Object.keys(formats).join(",")} disabled={sending} onChange={(event) => {
         choose(event.currentTarget.files?.[0]);
         event.currentTarget.value = "";
       }} />
-    {cameraOpen ? <div className="photo-draft">
-      <video ref={video} autoPlay playsInline muted aria-label="Vista previa de la cámara"
-        onCanPlay={() => setCameraReady(true)} />
-      <div className="dialog-actions">
-        <button className="secondary" type="button" disabled={capturing} onClick={() => setCameraOpen(false)}>Cancelar</button>
-        <button className="primary" type="button" disabled={!cameraReady || capturing || sending}
-          onClick={() => void takePhoto()}>Tomar foto</button>
+    {cameraOpen && <dialog ref={cameraDialog} className="chat-camera" aria-label="Cámara"
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!capturing) setCameraOpen(false);
+      }}>
+      <button className="camera-close icon-button" type="button" aria-label="Cerrar cámara" disabled={capturing}
+        onClick={() => setCameraOpen(false)}><X size={22} /></button>
+      <div className="camera-view">
+        <video key={facing} ref={video} autoPlay playsInline muted aria-label="Vista previa de la cámara"
+          onCanPlay={() => setCameraReady(true)} />
+        {cameraError ? <p className="camera-status" role="alert">{cameraError}</p>
+          : !cameraReady && <p className="camera-status" role="status">Abriendo cámara…</p>}
       </div>
-    </div>
-      : !photo ? <div className="photo-actions">
+      <div className="camera-controls">
+        <button className="camera-shutter" type="button" aria-label="Tomar foto" disabled={!cameraReady || capturing || sending}
+          onClick={() => void takePhoto()}><Camera size={26} /></button>
+        <button className="camera-switch icon-button" type="button" aria-label="Cambiar cámara" title="Cambiar cámara"
+          disabled={capturing || (!cameraReady && !cameraError)} onClick={changeCamera}><SwitchCamera size={23} /></button>
+      </div>
+    </dialog>}
+    {!photo ? <div className="photo-actions">
         <button className="icon-button" type="button" disabled={sending} aria-label="Abrir cámara" title="Abrir cámara"
-          onClick={() => { setError(""); setCameraReady(false); setCameraOpen(true); }}><Camera size={19} /></button>
+          onClick={() => {
+            setError("");
+            setCameraError("");
+            setCameraReady(false);
+            setSwitching(false);
+            setFacing("environment");
+            setCameraOpen(true);
+          }}><Camera size={19} /></button>
         <button className="icon-button" type="button" disabled={sending} onClick={() => chooser.current?.click()}
           aria-label="Adjuntar foto" title="Adjuntar foto"><ImagePlus size={19} /></button>
       </div>
