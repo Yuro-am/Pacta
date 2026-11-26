@@ -53,7 +53,11 @@ export default function Home() {
   const [view, setView] = useState<View>("Inicio");
   const [viewDirection, setViewDirection] = useState<"forward" | "backward">();
   const bottomNav = useRef<HTMLElement>(null);
-  const swipe = useRef<{ id: number; x: number; y: number; horizontal: boolean } | null>(null);
+  const swipeViewport = useRef<HTMLDivElement>(null);
+  const [swipePreview, setSwipePreview] = useState<{ view: View; direction: number } | null>(null);
+  const swipeTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(swipeTimer.current), []);
+  const swipe = useRef<{ id: number; x: number; y: number; horizontal: boolean; preview?: View } | null>(null);
   const [localDebts, setLocalDebts] = useState<Debt[]>([]);
   const [shared, setShared] = useState<{ actor: string; debts: Debt[]; signature?: string } | null>(null);
   const [socialState, setSocialState] = useState<{ actor: string; data: SocialData; signature: string } | null>(null);
@@ -413,9 +417,10 @@ export default function Home() {
     }
   }
 
-  function navigate(next: View) {
+  function navigate(next: View, animate = true) {
+    if (swipeTimer.current !== undefined) clearSwipePreview();
     if (next !== view) {
-      setViewDirection(nav.findIndex(({ label }) => label === next) > nav.findIndex(({ label }) => label === view)
+      setViewDirection(!animate ? undefined : nav.findIndex(({ label }) => label === next) > nav.findIndex(({ label }) => label === view)
         ? "forward" : "backward");
     }
     setView(next);
@@ -425,19 +430,53 @@ export default function Home() {
   }
 
   function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!event.isPrimary || event.pointerType !== "touch" || dialog) return;
+    if (!event.isPrimary || event.pointerType !== "touch" || dialog || swipeTimer.current !== undefined) return;
     if (event.clientX < 20 || event.clientX > window.innerWidth - 20) return;
     if (!(event.target instanceof Element) || event.target.closest("button, a, input, select, textarea, label, [contenteditable]")) return;
     swipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY, horizontal: false };
   }
 
-  function resetSwipe() {
+  function clearSwipePreview() {
+    window.clearTimeout(swipeTimer.current);
+    swipeTimer.current = undefined;
+    const viewport = swipeViewport.current;
+    if (viewport) {
+      delete viewport.dataset.settling;
+      viewport.style.removeProperty("--page-offset");
+    }
+    bottomNav.current?.style.removeProperty("--swipe-offset");
+    setSwipePreview(null);
+  }
+
+  function settleSwipe(next?: View, direction = 0) {
+    const start = swipe.current;
+    if (!start) return;
     swipe.current = null;
     const bar = bottomNav.current;
-    if (!bar) return;
-    delete bar.dataset.swiping;
-    bar.style.removeProperty("--swipe-offset");
-    bar.style.removeProperty("--swipe-stretch");
+    if (bar) {
+      delete bar.dataset.swiping;
+      bar.style.removeProperty("--swipe-stretch");
+      if (next) {
+        const columns = next === "Actividad" || view === "Actividad" ? 2 : 1;
+        bar.style.setProperty("--swipe-offset", `${-direction * columns * (bar.clientWidth - 10) / 4}px`);
+      } else {
+        bar.style.removeProperty("--swipe-offset");
+      }
+    }
+
+    const viewport = swipeViewport.current;
+    if (!viewport || !start.preview) return;
+    const complete = () => {
+      clearSwipePreview();
+      if (next) navigate(next, false);
+    };
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      complete();
+      return;
+    }
+    viewport.dataset.settling = "";
+    viewport.style.setProperty("--page-offset", next ? `${direction * (viewport.clientWidth + 10)}px` : "0px");
+    swipeTimer.current = window.setTimeout(complete, 220);
   }
 
   function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
@@ -446,14 +485,23 @@ export default function Home() {
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
     if (!start.horizontal) {
-      if (Math.abs(dy) > 12 && Math.abs(dy) >= Math.abs(dx)) return resetSwipe();
+      if (Math.abs(dy) > 12 && Math.abs(dy) >= Math.abs(dx)) return settleSwipe();
       if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
       start.horizontal = true;
     }
+    const direction = dx < 0 ? 1 : -1;
+    const index = nav.findIndex(({ label }) => label === view);
+    const next = nav[index + direction]?.label;
+    if (next !== start.preview) {
+      start.preview = next;
+      setSwipePreview(next ? { view: next, direction } : null);
+    }
+    const viewport = swipeViewport.current;
+    if (viewport) viewport.style.setProperty("--page-offset",
+      `${next ? -direction * Math.min(Math.abs(dx), viewport.clientWidth + 10) : 0}px`);
     const bar = bottomNav.current;
     if (!bar) return;
-    const atEdge = (view === "Inicio" && dx > 0) || (view === "Actividad" && dx < 0);
-    const offset = atEdge ? 0 : Math.min(Math.abs(dx) * .42, 64);
+    const offset = next ? Math.min(Math.abs(dx) * .42, 64) : 0;
     bar.dataset.swiping = "";
     bar.style.setProperty("--swipe-offset", `${-Math.sign(dx) * offset}px`);
     bar.style.setProperty("--swipe-stretch", String(1 + offset / 400));
@@ -462,13 +510,22 @@ export default function Home() {
   function finishSwipe(event: ReactPointerEvent<HTMLDivElement>) {
     const start = swipe.current;
     if (!start || start.id !== event.pointerId) return;
-    resetSwipe();
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (!start.horizontal || Math.abs(dx) < 52 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    const current = nav.findIndex(({ label }) => label === view);
-    const next = nav[current + (dx < 0 ? 1 : -1)];
-    if (next) navigate(next.label);
+    const direction = Math.sign(dx);
+    const index = nav.findIndex(({ label }) => label === view);
+    const next = nav[index - direction]?.label;
+    if (!start.horizontal || Math.abs(dx) < 44 || Math.abs(dx) < Math.abs(dy) * 1.5 || next !== start.preview) {
+      settleSwipe();
+    } else {
+      settleSwipe(next, direction);
+    }
+  }
+
+  function tapMobileTab(event: ReactPointerEvent<HTMLButtonElement>, next: View) {
+    if (event.pointerType !== "touch" || !event.isPrimary) return;
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    if (event.currentTarget.contains(target)) navigate(next);
   }
 
   async function addDebt(form: FormData, split?: GroupSplit) {
@@ -640,6 +697,78 @@ export default function Home() {
     })}</div>;
   }
 
+  function renderView(section: View, preview = false) {
+    return section === "Inicio" ? <>
+      <div className="page-heading">
+        <div><h1>¡Hola, {firstName}!</h1></div>
+        <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button>
+      </div>
+
+      <section className="balance" aria-label="Resumen de saldo">
+        <h2 className="balance-label"><span><Wallet size={17} /></span> Tu balance</h2>
+        <div className="balance-grid">
+          <div><span><ArrowDownLeft size={16} /> Te deben</span><strong>{euros(owed)}</strong></div>
+          <div><span><ArrowUpRight size={16} /> Debes</span><strong>{euros(owe)}</strong></div>
+        </div>
+      </section>
+
+      <div className="home-dashboard">
+        <section>
+          <div className="section-heading"><h2>Actividad reciente</h2><button onClick={() => navigate("Actividad")}>Ver todo <ArrowRight size={15} /></button></div>
+          {debtList(debts.slice(0, 4))}
+        </section>
+      </div>
+    </> : section === "Social" ? <>
+      {!preview && group && <button className="back" onClick={() => setGroup(null)}>← Todos los grupos</button>}
+      <div className="page-heading"><div><h1>{(!preview && groupName) || "Social"}</h1><p>{!preview && group ? "Las cuentas de vuestro grupo, en un solo lugar." : "Compartid planes y llevad las cuentas al día."}</p></div>
+      <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
+      {!preview && groupName ? <>
+        {realGroup?.owner && <button className="danger invitation-button" type="button"
+          onClick={() => void deleteGroup(realGroup)}><Trash2 size={16} /> Borrar grupo</button>}
+        {realGroup && social && <GroupInvite group={realGroup} friends={social.friends} run={runSocialAction} />}
+        <div className="members">{realGroup ? realGroup.members.map((member, index) =>
+          <span key={member.id}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member.name[0]}</span>{member.name}</span>
+        ) : groups.find((item) => item.name === group)?.members.map((member, index) =>
+          <span key={member}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member === "Álex" ? initial : member[0]}</span>{member === "Álex" ? firstName : member}</span>
+        )}</div>
+        {realGroup && client && userId && <GroupBalances key={`${userId}:${realGroup.id}`}
+          client={client} groupId={realGroup.id} userId={userId}
+          refreshKey={visibleDebts.map((debt) => `${debt.id}:${debt.stage}`).sort().join(",")} />}
+        <div className="section-heading"><h2>Movimientos del grupo</h2></div>
+        {debtList(visibleDebts)}
+      </> : userId ? (social ? <SocialPanel data={social} run={runSocialAction} openGroup={showGroup} />
+        : <p role="status">{socialUnavailableFor === userId ? "Amigos y grupos aún no están disponibles. Comprueba la configuración de Supabase." : "Cargando amigos y grupos…"}</p>)
+        : <><button className="secondary invitation-button" onClick={() => setDialog("profile")}>Inicia sesión para añadir amigos y grupos</button>
+          <div className="groups-page">{demoGroupList()}</div></>}
+    </> : <>
+      <div className="page-heading"><div><h1>Actividad</h1><p>Consulta tus deudas, propuestas y pagos.</p></div>
+      <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
+      <button className="secondary invitation-button" aria-expanded={!preview && showTrash}
+        onClick={() => { setTrashError(""); setShowTrash(!showTrash); }}>
+        <Trash2 size={17} /> {!preview && showTrash ? "Volver a actividad" : `Papelera${trash.length ? ` (${trash.length})` : ""}`}
+      </button>
+      {!preview && showTrash ? <section aria-label="Papelera de deudas">
+        <div className="section-heading"><h2>Papelera</h2></div>
+        {!trashPrompt && trashError && <p role="alert">{trashError}</p>}
+        <div className="debt-list">{trash.length ? trash.map((debt) =>
+          <div key={debt.id} className="trash-row">
+            <div className="row-copy"><strong>{debt.title}</strong><small>{debt.friend} · {euros(debt.amount)}</small></div>
+            <div className="trash-actions">
+              <button className="secondary" disabled={busy} onClick={() => void changeTrash(debt, "restore")}>Restaurar</button>
+              <button className="danger" disabled={busy} onClick={() => confirmTrash(debt, "purge")}>Borrar definitivamente</button>
+            </div>
+          </div>
+        ) : <p className="empty">La papelera está vacía.</p>}</div>
+      </section> : <>
+      <div className="filters" aria-label="Filtrar actividad">{(["Todo", "Pendientes", "Saldadas"] as const).map((item) =>
+        <button key={item} aria-pressed={(preview ? "Todo" : filter) === item} className={(preview ? "Todo" : filter) === item ? "filter-active" : ""} onClick={() => setFilter(item)}>{item}</button>
+      )}</div>
+      {(preview ? debts : visibleDebts).some(canTrash) && <p className="trash-hint">Mantén pulsada una deuda o deslízala hacia un lado para moverla a la papelera.</p>}
+      {debtList(preview ? debts : visibleDebts)}
+      </>}
+    </>;
+  }
+
   return (
     <div className="app-shell" data-view={view}>
       <aside className="sidebar">
@@ -695,90 +824,27 @@ export default function Home() {
         </header>
 
         <div className="content" onPointerDown={startSwipe} onPointerMove={moveSwipe}
-          onPointerUp={finishSwipe} onPointerCancel={resetSwipe}>
+          onPointerUp={finishSwipe} onPointerCancel={() => settleSwipe()}>
           {sharedError?.actor === userId && sharedError && <p role="status" className="dialog-description">{sharedUnavailable
             ? "Las invitaciones aún no están activadas. Puedes seguir usando tus deudas locales."
             : "No se pudieron cargar las deudas compartidas."}</p>}
           {invite && dialog !== "invite" && <button className="secondary invitation-button" onClick={() => setDialog("invite")}>Abrir invitación pendiente</button>}
-          <div className="view-content" key={view} data-direction={viewDirection}>
-          {view === "Inicio" ? <>
-            <div className="page-heading">
-              <div><h1>¡Hola, {firstName}!</h1></div>
-              <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button>
+          <div className="swipe-viewport" ref={swipeViewport} data-preview={Boolean(swipePreview)}>
+            <div className="view-content" key={view} data-direction={viewDirection}>
+              {renderView(view)}
             </div>
-
-            <section className="balance" aria-label="Resumen de saldo">
-              <h2 className="balance-label"><span><Wallet size={17} /></span> Tu balance</h2>
-              <div className="balance-grid">
-                <div><span><ArrowDownLeft size={16} /> Te deben</span><strong>{euros(owed)}</strong></div>
-                <div><span><ArrowUpRight size={16} /> Debes</span><strong>{euros(owe)}</strong></div>
-              </div>
-            </section>
-
-            <div className="home-dashboard">
-              <section>
-                <div className="section-heading"><h2>Actividad reciente</h2><button onClick={() => navigate("Actividad")}>Ver todo <ArrowRight size={15} /></button></div>
-                {debtList(debts.slice(0, 4))}
-              </section>
-            </div>
-          </> : view === "Social" ? <>
-            {group && <button className="back" onClick={() => setGroup(null)}>← Todos los grupos</button>}
-            <div className="page-heading"><div><h1>{groupName ?? "Social"}</h1><p>{group ? "Las cuentas de vuestro grupo, en un solo lugar." : "Compartid planes y llevad las cuentas al día."}</p></div>
-            <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
-            {groupName ? <>
-              {realGroup?.owner && <button className="danger invitation-button" type="button"
-                onClick={() => void deleteGroup(realGroup)}><Trash2 size={16} /> Borrar grupo</button>}
-              {realGroup && social && <GroupInvite group={realGroup} friends={social.friends} run={runSocialAction} />}
-              <div className="members">{realGroup ? realGroup.members.map((member, index) =>
-                <span key={member.id}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member.name[0]}</span>{member.name}</span>
-              ) : groups.find((item) => item.name === group)?.members.map((member, index) =>
-                <span key={member}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member === "Álex" ? initial : member[0]}</span>{member === "Álex" ? firstName : member}</span>
-              )}</div>
-              {realGroup && client && userId && <GroupBalances key={`${userId}:${realGroup.id}`}
-                client={client} groupId={realGroup.id} userId={userId}
-                refreshKey={visibleDebts.map((debt) => `${debt.id}:${debt.stage}`).sort().join(",")} />}
-              <div className="section-heading"><h2>Movimientos del grupo</h2></div>
-              {debtList(visibleDebts)}
-            </> : userId ? (social ? <SocialPanel data={social} run={runSocialAction} openGroup={showGroup} />
-              : <p role="status">{socialUnavailableFor === userId ? "Amigos y grupos aún no están disponibles. Comprueba la configuración de Supabase." : "Cargando amigos y grupos…"}</p>)
-              : <><button className="secondary invitation-button" onClick={() => setDialog("profile")}>Inicia sesión para añadir amigos y grupos</button>
-                <div className="groups-page">{demoGroupList()}</div></>}
-          </> : <>
-            <div className="page-heading"><div><h1>Actividad</h1><p>Consulta tus deudas, propuestas y pagos.</p></div>
-            <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
-            <button className="secondary invitation-button" aria-expanded={showTrash}
-              onClick={() => { setTrashError(""); setShowTrash(!showTrash); }}>
-              <Trash2 size={17} /> {showTrash ? "Volver a actividad" : `Papelera${trash.length ? ` (${trash.length})` : ""}`}
-            </button>
-            {showTrash ? <section aria-label="Papelera de deudas">
-              <div className="section-heading"><h2>Papelera</h2></div>
-              {!trashPrompt && trashError && <p role="alert">{trashError}</p>}
-              <div className="debt-list">{trash.length ? trash.map((debt) =>
-                <div key={debt.id} className="trash-row">
-                  <div className="row-copy"><strong>{debt.title}</strong><small>{debt.friend} · {euros(debt.amount)}</small></div>
-                  <div className="trash-actions">
-                    <button className="secondary" disabled={busy} onClick={() => void changeTrash(debt, "restore")}>Restaurar</button>
-                    <button className="danger" disabled={busy} onClick={() => confirmTrash(debt, "purge")}>Borrar definitivamente</button>
-                  </div>
-                </div>
-              ) : <p className="empty">La papelera está vacía.</p>}</div>
-            </section> : <>
-            <div className="filters" aria-label="Filtrar actividad">{(["Todo", "Pendientes", "Saldadas"] as const).map((item) =>
-              <button key={item} aria-pressed={filter === item} className={filter === item ? "filter-active" : ""} onClick={() => setFilter(item)}>{item}</button>
-            )}</div>
-            {visibleDebts.some(canTrash) && <p className="trash-hint">Mantén pulsada una deuda o deslízala hacia un lado para moverla a la papelera.</p>}
-            {debtList(visibleDebts)}
-            </>}
-          </>}
+            {swipePreview && <div className="swipe-preview" data-side={swipePreview.direction > 0 ? "right" : "left"} inert aria-hidden="true">
+              {renderView(swipePreview.view, true)}
+            </div>}
           </div>
         </div>
       </main>
 
       <nav ref={bottomNav} className="bottom-nav" aria-label="Navegación móvil">
-        <button onClick={() => navigate("Inicio")} aria-current={view === "Inicio" ? "page" : undefined} className={view === "Inicio" ? "bottom-active" : ""}><LayoutGrid size={21} /> Inicio</button>
-        <button onClick={() => navigate("Social")} aria-current={view === "Social" ? "page" : undefined} className={view === "Social" ? "bottom-active" : ""}><UsersRound size={21} /> Social{pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}</button>
+        <button onPointerUp={(event) => tapMobileTab(event, "Inicio")} onClick={() => navigate("Inicio")} aria-current={view === "Inicio" ? "page" : undefined} className={view === "Inicio" ? "bottom-active" : ""}><LayoutGrid size={21} /> Inicio</button>
+        <button onPointerUp={(event) => tapMobileTab(event, "Social")} onClick={() => navigate("Social")} aria-current={view === "Social" ? "page" : undefined} className={view === "Social" ? "bottom-active" : ""}><UsersRound size={21} /> Social{pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}</button>
         <button className="bottom-add" onClick={() => setDialog("new")}><span><Plus size={22} /></span> Añadir</button>
-        <button onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
+        <button onPointerUp={(event) => tapMobileTab(event, "Actividad")} onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
 
       {((dialog && dialog !== "messages") || active || trashDebt || (chatTarget && client && userId)) && <Modal explicitClose={Boolean(chatTarget)} close={() => {
