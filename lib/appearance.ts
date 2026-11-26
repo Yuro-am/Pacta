@@ -5,9 +5,10 @@ export const accents = [
   { id: "blue", label: "Azul" },
   { id: "green", label: "Verde" },
   { id: "yellow", label: "Amarillo" },
+  { id: "rose", label: "Rosa" },
 ] as const;
 
 export type Accent = typeof accents[number]["id"];
 
 export const defaultAccent: Accent = "blue";
-export const previousAccents: Record<string, Accent> = { purple: "blue", rose: "red", amber: "yellow" };
+export const previousAccents: Record<string, Accent> = { purple: "blue", amber: "yellow" };

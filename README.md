@@ -80,13 +80,15 @@ En **Grupos**, crea un grupo, ábrelo y selecciona a un amigo para invitarlo. La
 
 ## Chat entre amigos
 
-Ejecuta [202611220004_friend_chat.sql](supabase/migrations/202611220004_friend_chat.sql) en Supabase después de activar Amigos y Grupos. En **Grupos → Mis amigos**, pulsa **Chat** al lado de una amistad aceptada. La conversación es privada y muestra los 50 mensajes más recientes. El chat se actualiza mientras está abierto.
+Ejecuta [202611220004_friend_chat.sql](supabase/migrations/202611220004_friend_chat.sql) en Supabase después de activar Amigos y Grupos. En el botón **Chats** de la barra superior, elige una amistad aceptada en **Individuales**. La conversación es privada y muestra los 50 mensajes más recientes. El chat se actualiza mientras está abierto.
 
 ## Bandeja de mensajes y notificaciones
 
-Ejecuta [202611220005_inbox_and_notifications.sql](supabase/migrations/202611220005_inbox_and_notifications.sql) en Supabase después de activar el chat. El icono del avión de papel en la esquina superior derecha abre tus conversaciones recientes. La campana avisa de los mensajes sin leer, las deudas nuevas y los cambios en propuestas o pagos. Pulsa un aviso para abrir la conversación o la deuda. Los avisos aparecen dentro de PACTA mientras tienes la app abierta.
+Ejecuta [202611220005_inbox_and_notifications.sql](supabase/migrations/202611220005_inbox_and_notifications.sql) en Supabase después de activar el chat. El botón **Chats** de la barra superior abre tus conversaciones individuales y de grupo. La campana avisa de los mensajes sin leer, las deudas nuevas y los cambios en propuestas o pagos. Pulsa un aviso para abrir la conversación o la deuda. Los avisos aparecen dentro de PACTA mientras tienes la app abierta.
 
 ## Nombres de usuario y registro sin confirmación
+
+Antes de desplegar el registro con reserva de nombres, aplica [202611220017_reserve_signup_usernames.sql](supabase/migrations/202611220017_reserve_signup_usernames.sql) en Supabase después de la migración `202611220006_usernames.sql`. Los nombres se reservan al crear la cuenta, incluso si queda pendiente de confirmar el correo. Al guardar un nombre nuevo en el perfil, el anterior queda disponible.
 
 Ejecuta [202611220006_usernames.sql](supabase/migrations/202611220006_usernames.sql) en Supabase después de la migración de Amigos y Grupos. Las cuentas existentes eligen su nombre de usuario en **Mi perfil → Guardar perfil**. Las cuentas nuevas lo eligen al registrarse. Los nombres son únicos y las solicitudes de amistad usan el nombre de usuario exacto. El correo se sigue usando para iniciar sesión.
 
@@ -112,11 +114,11 @@ Ejecuta [202611220011_chat_voice_notes.sql](supabase/migrations/202611220011_cha
 
 ### Chat de grupo
 
-Tras activar los audios, ejecuta [202611220012_group_chat.sql](supabase/migrations/202611220012_group_chat.sql). Abre **Grupos → Chat del grupo**, o elige el grupo en el menú del avión de papel para enviar texto, emojis y notas de voz. Solo los miembros aceptados pueden acceder al chat y a sus audios.
+Tras activar los audios, ejecuta [202611220012_group_chat.sql](supabase/migrations/202611220012_group_chat.sql). Elige el grupo en **Chats → Grupos** para enviar texto, emojis y notas de voz. Solo los miembros aceptados pueden acceder al chat y a sus audios.
 
 ### Fotos en el chat
 
-Tras activar el chat de grupo y las notas de voz, ejecuta [202611220013_chat_photos.sql](supabase/migrations/202611220013_chat_photos.sql). Pulsa **Adjuntar foto** en un chat privado o de grupo y revisa la vista previa antes de enviarla. Se admiten JPG, PNG, WebP y GIF de hasta 8 MB. Las descargas requieren acceso al chat.
+Tras activar el chat de grupo y las notas de voz, ejecuta [202611220013_chat_photos.sql](supabase/migrations/202611220013_chat_photos.sql). En un chat privado o de grupo, pulsa **Abrir cámara** para tomar una foto o **Adjuntar foto** para elegir un archivo. Revisa la vista previa antes de enviarla. Se admiten JPG, PNG, WebP y GIF de hasta 8 MB. Las descargas requieren acceso al chat.
 
 ### Mensajes y solicitudes en tiempo real
 

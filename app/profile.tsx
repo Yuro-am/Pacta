@@ -165,6 +165,16 @@ export function ProfileDialog({ profile, initialMode = "profile", mobileSettings
       const password = String(form.get("password"));
 
       if (mode === "register") {
+        const { data: available, error: availabilityError } = await client.rpc("pacta_username_available", { p_username: handle });
+        if (availabilityError || !available) {
+          setFeedback({
+            text: availabilityError ? "No se pudo comprobar el nombre de usuario. Inténtalo de nuevo."
+              : "Ese nombre de usuario ya está ocupado. Elige otro.",
+            error: true,
+          });
+          return;
+        }
+
         const { data, error } = await client.auth.signUp({
           email,
           password,
@@ -173,12 +183,20 @@ export function ProfileDialog({ profile, initialMode = "profile", mobileSettings
             emailRedirectTo: new URL("/auth/callback", window.location.origin).href,
           },
         });
-        if (error) throw error;
+        if (error) {
+          if (error.code === "unexpected_failure") {
+            const { data: stillAvailable } = await client.rpc("pacta_username_available", { p_username: handle });
+            if (stillAvailable === false) {
+              setFeedback({ text: "Ese nombre de usuario ya está ocupado. Elige otro.", error: true });
+              return;
+            }
+          }
+          throw error;
+        }
         setMode(data.session ? "profile" : "login");
         if (data.session) {
-          const handleError = await saveUsername(handle);
           setUsername(handle);
-          setFeedback({ text: handleError ? `Cuenta creada. ${handleError}` : "Cuenta creada. Ya has iniciado sesión.", error: Boolean(handleError) });
+          setFeedback({ text: "Cuenta creada. Ya has iniciado sesión." });
         } else {
           setResendCoolingDown(true);
           setFeedback({ text: "Tu cuenta está pendiente. Si Supabase pide confirmación, revisa tu correo o solicita un reenvío." });

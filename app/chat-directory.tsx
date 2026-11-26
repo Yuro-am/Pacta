@@ -2,19 +2,20 @@
 
 import { useEffect, useState } from "react";
 import type { Conversation } from "../lib/inbox";
-import type { SocialGroup } from "../lib/social";
+import type { Person, SocialGroup } from "../lib/social";
 import type { createClient } from "../utils/supabase/client";
 import { MessageList } from "./inbox";
 
 type GroupMessage = { id: string; sender_id: string; body: string; created_at: string };
 
-export function RecentChats({ client, userId, friends, groups, refreshKey, openFriend, openGroup }: {
+export function ChatDirectory({ client, userId, conversations, friends, groups, refreshKey, openFriend, openGroup }: {
   client: NonNullable<ReturnType<typeof createClient>>;
   userId: string;
-  friends: Conversation[];
+  conversations: Conversation[];
+  friends: Person[];
   groups: SocialGroup[];
   refreshKey: number;
-  openFriend: (friend: Conversation) => void;
+  openFriend: (friend: Person) => void;
   openGroup: (group: SocialGroup) => void;
 }) {
   const [latest, setLatest] = useState<Record<string, GroupMessage | null>>({});
@@ -80,32 +81,37 @@ export function RecentChats({ client, userId, friends, groups, refreshKey, openF
     };
   }, [client, groupIds, refreshKey, userId]);
 
-  const groupChats: Conversation[] = groups.flatMap((group) => {
+  const known = new Set(conversations.map(({ id }) => id));
+  const individualChats = [...conversations, ...friends.filter(({ id }) => !known.has(id))
+    .sort((left, right) => left.name.localeCompare(right.name, "es"))
+    .map((friend) => ({ ...friend, body: "", created_at: "", mine: false, unread_count: 0 }))];
+
+  const groupChats = groups.map<Conversation>((group) => {
     const message = latest[group.id];
-    if (!message) return [];
-    const mine = message.sender_id === userId;
-    const sender = group.members.find((member) => member.id === message.sender_id)?.name;
-    return [{
+    const mine = message?.sender_id === userId;
+    const sender = group.members.find((member) => member.id === message?.sender_id)?.name;
+    return {
       id: group.id,
       name: group.name,
       kind: "group",
-      body: !mine && sender ? `${sender}: ${message.body}` : message.body,
-      created_at: message.created_at,
+      body: message ? (!mine && sender ? `${sender}: ${message.body}` : message.body) : "",
+      created_at: message?.created_at ?? "",
       mine,
       unread_count: 0,
-    }];
-  });
+    };
+  }).sort((left, right) => right.created_at.localeCompare(left.created_at) || left.name.localeCompare(right.name, "es"));
 
-  const conversations = [...friends, ...groupChats]
-    .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))
-    .slice(0, 4);
-
-  return <MessageList conversations={conversations} onOpen={(conversation) => {
-    if (conversation.kind !== "group") {
-      openFriend(conversation);
-      return;
-    }
-    const group = groups.find((item) => item.id === conversation.id);
-    if (group) openGroup(group);
-  }} />;
+  return <>
+    <section className="chat-directory-section">
+      <h3>Individuales</h3>
+      <MessageList conversations={individualChats} onOpen={openFriend} empty="Aún no tienes chats individuales." />
+    </section>
+    <section className="chat-directory-section">
+      <h3>Grupos</h3>
+      <MessageList conversations={groupChats} empty="Aún no tienes chats de grupo." onOpen={(conversation) => {
+        const group = groups.find((item) => item.id === conversation.id);
+        if (group) openGroup(group);
+      }} />
+    </section>
+  </>;
 }

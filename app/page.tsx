@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight,
+  ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronDown, ChevronRight,
   CircleDollarSign, CircleHelp, Coffee, Gift, HandHeart, House, LayoutGrid, List, Pizza,
-  Plane, Plus, ReceiptText, Send, Sparkles, MessageCircle, UsersRound, Wallet, X, Trash2,
+  Plane, Plus, ReceiptText, Sparkles, MessageCircle, UsersRound, Wallet, X, Trash2,
 } from "lucide-react";
 import { euros, groups, type Debt, type Method } from "../lib/demo";
 
@@ -13,10 +13,9 @@ import { watchSharedDebts } from "../lib/debt-realtime";
 import { describeSharedDebt, invitationUrl, type SharedDebtRow } from "../lib/shared-debts";
 import type { DebtNotice } from "../lib/inbox";
 import type { ChatTarget, Person, SocialData, SocialGroup } from "../lib/social";
-import { MessageList } from "./inbox";
 import { MobilePush } from "./mobile-push";
 import { Notifications } from "./notifications";
-import { RecentChats } from "./recent-chats";
+import { ChatDirectory } from "./chat-directory";
 import { useInbox } from "./use-inbox";
 import { ChatDialog } from "./chat";
 import { DebtGesture } from "./debt-gesture";
@@ -301,6 +300,14 @@ export default function Home() {
       return false;
     } finally {
       socialActionInProgress.current = false;
+    }
+  }
+
+  async function deleteGroup(item: SocialGroup) {
+    if (!window.confirm(`¿Borrar «${item.name}» y su chat para todos? Las deudas seguirán en Actividad.`)) return;
+    if (await runSocialAction("pacta_delete_group", { p_group: item.id })) {
+      setGroup((current) => current === item.id ? null : current);
+      refreshGroupChats();
     }
   }
 
@@ -610,32 +617,23 @@ export default function Home() {
               setDialog("notifications"); void refreshInbox();
             }}><Bell size={19} />{unread > 0 && <span className="notification-count">{unread > 99 ? "99+" : unread}</span>}</button>
             {userId && <div className="message-area" ref={messageArea}>
-              <button ref={messageButton} className="icon-button notification" title="Mensajes"
-                aria-label={inbox?.unread_messages ? `Mensajes (${inbox.unread_messages} sin leer)` : "Mensajes"}
+              <button ref={messageButton} className="icon-button notification chat-menu-button" title="Chats"
+                aria-label={inbox?.unread_messages ? `Chats (${inbox.unread_messages} sin leer)` : "Chats"}
                 aria-expanded={dialog === "messages"} aria-controls="message-menu"
                 onClick={() => {
                   setDialog(dialog === "messages" ? null : "messages");
                   if (dialog !== "messages") void refreshInbox();
                 }}>
-                <Send size={18} />
+                <MessageCircle size={18} /><span>Chats</span><ChevronDown size={14} />
                 {Boolean(inbox?.unread_messages) && <span className="notification-count" aria-hidden="true">
                   {(inbox?.unread_messages ?? 0) > 99 ? "99+" : inbox?.unread_messages}
                 </span>}
               </button>
               {dialog === "messages" && <section id="message-menu" className="message-menu" aria-labelledby="message-menu-title">
-                <div className="section-heading">
-                  <h2 id="message-menu-title">Mensajes</h2>
-                  <button onClick={() => { setDialog(null); navigate("Grupos"); }}>Nuevo mensaje</button>
-                </div>
-                <MessageList conversations={inbox?.conversations ?? []} onOpen={openChat} />
-                {groupsForDebt.length > 0 && <section className="group-chats">
-                  <h3>Chats de grupo</h3>
-                  <div className="group-list">{groupsForDebt.map((item) => <button key={item.id} className="group-row" onClick={() => openGroupChat(item)}>
-                    <span className="tile lilac"><UsersRound size={18} /></span>
-                    <span className="row-copy"><strong>{item.name}</strong></span>
-                    <ChevronRight className="row-chevron" size={16} />
-                  </button>)}</div>
-                </section>}
+                <h2 id="message-menu-title">Chats</h2>
+                {client && <ChatDirectory key={userId} client={client} userId={userId}
+                  conversations={inbox?.conversations ?? []} friends={social?.friends.filter((friend) => friend.accepted) ?? []}
+                  groups={groupsForDebt} refreshKey={groupChatRevision} openFriend={openChat} openGroup={openGroupChat} />}
               </section>}
             </div>}
             <button className="avatar top-avatar" onClick={() => setDialog("profile")} aria-label="Mi perfil">{initial}</button>
@@ -662,22 +660,10 @@ export default function Home() {
               </div>
             </section>
 
-            <div className="dashboard-grid home-dashboard">
+            <div className="home-dashboard">
               <section>
                 <div className="section-heading"><h2>Actividad reciente</h2><button onClick={() => navigate("Actividad")}>Ver todo <ArrowRight size={15} /></button></div>
                 {debtList(debts.slice(0, 4))}
-              </section>
-              <section>
-                <div className="section-heading">
-                  <h2>Chats recientes</h2>
-                  {userId && <button onClick={() => {
-                    setDialog("messages"); void refreshInbox();
-                  }}>Ver todos <ArrowRight size={15} /></button>}
-                </div>
-                {userId && client ? <RecentChats key={userId} client={client} userId={userId}
-                  friends={inbox?.conversations ?? []} groups={groupsForDebt}
-                  refreshKey={groupChatRevision} openFriend={openChat} openGroup={openGroupChat} />
-                  : <div className="debt-list"><p className="empty">Inicia sesión para ver tus chats.</p></div>}
               </section>
             </div>
           </> : view === "Grupos" ? <>
@@ -685,7 +671,8 @@ export default function Home() {
             <div className="page-heading"><div><h1>{groupName ?? "Amigos y grupos"}</h1><p>{group ? "Las cuentas de vuestro grupo, en un solo lugar." : "Compartid planes y llevad las cuentas al día."}</p></div>
             <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
             {groupName ? <>
-              {realGroup && <button className="secondary invitation-button" onClick={() => openGroupChat(realGroup)}><MessageCircle size={18} /> Chat del grupo</button>}
+              {realGroup?.owner && <button className="danger invitation-button" type="button"
+                onClick={() => void deleteGroup(realGroup)}><Trash2 size={16} /> Borrar grupo</button>}
               {realGroup && social && <GroupInvite group={realGroup} friends={social.friends} run={runSocialAction} />}
               <div className="members">{realGroup ? realGroup.members.map((member, index) =>
                 <span key={member.id}><span className="avatar" style={{ background: avatars[index % avatars.length] }}>{member.name[0]}</span>{member.name}</span>
@@ -697,7 +684,7 @@ export default function Home() {
                 refreshKey={visibleDebts.map((debt) => `${debt.id}:${debt.stage}`).sort().join(",")} />}
               <div className="section-heading"><h2>Movimientos del grupo</h2></div>
               {debtList(visibleDebts)}
-            </> : userId ? (social ? <SocialPanel data={social} run={runSocialAction} openGroup={showGroup} openChat={openChat} />
+            </> : userId ? (social ? <SocialPanel data={social} run={runSocialAction} openGroup={showGroup} />
               : <p role="status">{socialUnavailableFor === userId ? "Amigos y grupos aún no están disponibles. Comprueba la configuración de Supabase." : "Cargando amigos y grupos…"}</p>)
               : <><button className="secondary invitation-button" onClick={() => setDialog("profile")}>Inicia sesión para añadir amigos y grupos</button>
                 <div className="groups-page">{demoGroupList()}</div></>}
@@ -756,7 +743,8 @@ export default function Home() {
               {trashPrompt.action === "purge" ? "Borrar definitivamente" : "Mover a la papelera"}
             </button>
           </div>
-        </> : chatTarget && client && userId ? <ChatDialog key={`${userId}:${chatTarget.kind}:${chatTarget.id}`} client={client} userId={userId} target={chatTarget} trackRead={Boolean(inbox)} onChange={chatTarget.kind === "group" ? refreshGroupChats : refreshInbox} />
+        </> : chatTarget && client && userId ? <ChatDialog key={`${userId}:${chatTarget.kind}:${chatTarget.id}`} client={client} userId={userId} target={chatTarget}
+          trackRead={Boolean(inbox)} onChange={chatTarget.kind === "group" ? refreshGroupChats : refreshInbox} onClose={() => setChatTarget(null)} />
           : dialog === "invite" ? <>
           <h2 id="dialog-title">Invitación de PACTA</h2>
           <p className="dialog-description">{!invite ? "Este enlace no es válido." : !client

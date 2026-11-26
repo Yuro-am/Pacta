@@ -1,16 +1,14 @@
 "use client";
 
-import { MessageCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import type { Person, SocialData, SocialGroup } from "../lib/social";
+import type { SocialData, SocialGroup } from "../lib/social";
 
 type RunAction = (name: string, args: Record<string, string>) => Promise<boolean>;
 
-export function SocialPanel({ data, run, openGroup, openChat }: {
+export function SocialPanel({ data, run, openGroup }: {
   data: SocialData;
   run: RunAction;
   openGroup: (id: string) => void;
-  openChat: (friend: Person) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const incoming = data.friends.filter((friend) => !friend.accepted && friend.incoming);
@@ -52,9 +50,6 @@ export function SocialPanel({ data, run, openGroup, openChat }: {
         <h3>Mis amigos</h3>
         {friends.length ? friends.map((friend) => <div className="social-row" key={friend.id}>
           <span><strong>{friend.name}</strong>{friend.username && <small>@{friend.username}</small>}</span>
-          <button className="secondary" onClick={() => openChat(friend)} aria-label={`Abrir chat con ${friend.name}`}>
-            <MessageCircle size={17} /> Chat
-          </button>
         </div>) : <p className="dialog-description">Aquí aparecerán las amistades aceptadas.</p>}
       </section>
       {outgoing.length > 0 && <section className="friend-section">

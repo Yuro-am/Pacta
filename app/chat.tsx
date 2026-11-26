@@ -1,6 +1,6 @@
 "use client";
 
-import { Send, Smile } from "lucide-react";
+import { Send, Smile, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatTarget } from "../lib/social";
 import type { createClient } from "../utils/supabase/client";
@@ -13,12 +13,13 @@ type Message = { id: string; sender_id: string; body: string; created_at: string
 const emojis = ["😀", "😂", "😊", "😍", "😅", "🥲", "😎", "🤝", "👍", "🙌", "❤️", "🔥", "🎉", "🍕", "🍻", "💸"];
 const messageTime = new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" });
 
-export function ChatDialog({ client, userId, target, trackRead, onChange }: {
+export function ChatDialog({ client, userId, target, trackRead, onChange, onClose }: {
   client: NonNullable<ReturnType<typeof createClient>>;
   userId: string;
   target: ChatTarget;
   trackRead: boolean;
   onChange: () => void;
+  onClose: () => void;
 }) {
   const isGroup = target.kind === "group";
   const table = isGroup ? "pacta_group_messages" : "pacta_messages";
@@ -32,6 +33,8 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
   const [sendingVoice, setSendingVoice] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [sendError, setSendError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const inFlight = useRef(false);
   const queuedRefresh = useRef(false);
   const revision = useRef(0);
@@ -128,10 +131,39 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
     void refresh();
   }
 
+  async function deleteFromChat(messageId?: string) {
+    if (deleting || sending) return;
+    const prompt = messageId ? "¿Borrar este mensaje para todos?"
+      : "¿Borrar el historial de este chat para ti? Los mensajes nuevos volverán a aparecer.";
+    if (!window.confirm(prompt)) return;
+
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const { error } = messageId
+        ? await client.rpc("pacta_delete_chat_message", { p_message: messageId, p_group: isGroup })
+        : await client.rpc("pacta_clear_chat", { p_peer: target.id });
+      if (error) throw error;
+
+      revision.current++;
+      onChange();
+      if (messageId) {
+        setMessages((previous) => previous.filter((item) => item.id !== messageId));
+        void refresh();
+      } else {
+        onClose();
+      }
+    } catch {
+      setDeleteError(messageId ? "No se pudo borrar el mensaje." : "No se pudo borrar el chat.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = draft.trim();
-    if (!body || sending) return;
+    if (!body || sending || deleting) return;
     stopTyping();
     const id = pending.current?.body === body ? pending.current.id : crypto.randomUUID();
     pending.current = { id, body };
@@ -150,7 +182,7 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
   }
 
   async function sendAttachment(file: VoiceRecording | PhotoAttachment, kind: "audio" | "photo") {
-    if (sending) return false;
+    if (sending || deleting) return false;
     setSending(true);
     if (kind === "audio") setSendingVoice(true);
     setSendError("");
@@ -192,6 +224,9 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
 
   return <>
     <h2 id="dialog-title">{isGroup ? "Chat de" : "Chat con"} {target.name}</h2>
+    {!isGroup && <button className="danger" type="button" disabled={deleting || sending || !messages.length}
+      onClick={() => void deleteFromChat()}><Trash2 size={16} /> Borrar chat para mí</button>}
+    {deleteError && <p role="alert">{deleteError}</p>}
     <div className="chat-history" ref={history} role="log" aria-label="Mensajes" onScroll={(event) => {
       const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
       stickToBottom.current = scrollHeight - scrollTop - clientHeight < 60;
@@ -205,7 +240,12 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
         </strong>}
         {message.photo_path ? <ChatPhoto client={client} path={message.photo_path} />
           : message.audio_path ? <VoicePlayer client={client} path={message.audio_path} /> : <p>{message.body}</p>}
-        <time dateTime={message.created_at}>{messageTime.format(new Date(message.created_at))}</time>
+        <div className="chat-message-actions">
+          <time dateTime={message.created_at}>{messageTime.format(new Date(message.created_at))}</time>
+          {message.sender_id === userId && <button className="icon-button" type="button" disabled={deleting || sending}
+            aria-label="Borrar mensaje para todos" title="Borrar mensaje para todos"
+            onClick={() => void deleteFromChat(message.id)}><Trash2 size={15} /></button>}
+        </div>
       </div>)}
     </div>
     <div className="chat-typing" role="status">
@@ -221,13 +261,13 @@ export function ChatDialog({ client, userId, target, trackRead, onChange }: {
       <div className="chat-tools">
         <button className="icon-button" type="button" disabled={sending} aria-label="Emojis" title="Emojis"
           aria-expanded={emojiOpen} onClick={() => setEmojiOpen(!emojiOpen)}><Smile size={19} /></button>
-        <VoiceComposer sending={sending} onRecordingChange={setRecordingVoice} send={(recording) => sendAttachment(recording, "audio")} />
-        <PhotoComposer sending={sending} send={(photo) => sendAttachment(photo, "photo")} />
+        <VoiceComposer sending={sending || deleting} onRecordingChange={setRecordingVoice} send={(recording) => sendAttachment(recording, "audio")} />
+        <PhotoComposer sending={sending || deleting} send={(photo) => sendAttachment(photo, "photo")} />
       </div>
       {emojiOpen && <div className="emoji-picker" role="group" aria-label="Seleccionar emoji">
         {emojis.map((emoji) => <button type="button" disabled={sending} key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}
       </div>}
-      <button className="primary" disabled={sending || !draft.trim()}><Send size={16} />{sending ? "Enviando…" : "Enviar mensaje"}</button>
+      <button className="primary" disabled={sending || deleting || !draft.trim()}><Send size={16} />{sending ? "Enviando…" : "Enviar mensaje"}</button>
       {sendError && <p role="alert">{sendError}</p>}
     </form>
   </>;

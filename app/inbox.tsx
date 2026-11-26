@@ -19,20 +19,21 @@ function timestamp(value: string) {
   return when.toDateString() === new Date().toDateString() ? clock.format(when) : date.format(when);
 }
 
-export function MessageList({ conversations, onOpen }: {
+export function MessageList({ conversations, onOpen, empty = "Aún no tienes conversaciones." }: {
   conversations: Conversation[];
+  empty?: string;
   onOpen: (conversation: Conversation) => void;
 }) {
   return <div className="debt-list">{conversations.length ? conversations.map((item) =>
     <button key={`${item.kind ?? "friend"}:${item.id}`} className={`debt-row inbox-row${item.unread_count ? " inbox-unread" : ""}`} onClick={() => onOpen(item)}>
       <span className="tile lilac">{item.kind === "group" ? <UsersRound size={19} /> : <MessageCircle size={19} />}</span>
-      <span className="row-copy"><strong>{item.name}</strong><small>{item.mine && "Tú: "}{item.body}</small></span>
-      <span className="inbox-meta"><time dateTime={item.created_at}>{timestamp(item.created_at)}</time>
+      <span className="row-copy"><strong>{item.name}</strong>{item.body && <small>{item.mine && "Tú: "}{item.body}</small>}</span>
+      <span className="inbox-meta">{item.created_at && <time dateTime={item.created_at}>{timestamp(item.created_at)}</time>}
         {item.unread_count > 0 && <span className="inbox-count" aria-label={`${item.unread_count} mensajes sin leer`}>{item.unread_count > 99 ? "99+" : item.unread_count}</span>}
       </span>
       <ChevronRight className="row-chevron" size={16} />
     </button>
-  ) : <p className="empty">Aún no tienes conversaciones. Puedes empezar un chat desde Grupos → Mis amigos.</p>}</div>;
+  ) : <p className="empty">{empty}</p>}</div>;
 }
 
 export function DebtNoticeList({ notices, onOpen }: {
