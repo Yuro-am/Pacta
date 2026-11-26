@@ -56,8 +56,15 @@ export default function Home() {
   const swipeViewport = useRef<HTMLDivElement>(null);
   const [swipePreview, setSwipePreview] = useState<{ view: View; direction: number } | null>(null);
   const swipeTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(swipeTimer.current), []);
-  const swipe = useRef<{ id: number; x: number; y: number; horizontal: boolean; preview?: View } | null>(null);
+  const swipeFrame = useRef<number | undefined>(undefined);
+  const finishSlide = useRef<(() => void) | null>(null);
+  useEffect(() => () => {
+    window.clearTimeout(swipeTimer.current);
+    if (swipeFrame.current !== undefined) window.cancelAnimationFrame(swipeFrame.current);
+  }, []);
+  const swipe = useRef<{
+    id: number; x: number; y: number; distance: number; width: number; horizontal: boolean; preview?: View;
+  } | null>(null);
   const [localDebts, setLocalDebts] = useState<Debt[]>([]);
   const [shared, setShared] = useState<{ actor: string; debts: Debt[]; signature?: string } | null>(null);
   const [socialState, setSocialState] = useState<{ actor: string; data: SocialData; signature: string } | null>(null);
@@ -418,6 +425,7 @@ export default function Home() {
   }
 
   function navigate(next: View, animate = true) {
+    if (swipe.current?.horizontal) return;
     if (swipeTimer.current !== undefined) clearSwipePreview();
     if (next !== view) {
       setViewDirection(!animate ? undefined : nav.findIndex(({ label }) => label === next) > nav.findIndex(({ label }) => label === view)
@@ -433,12 +441,17 @@ export default function Home() {
     if (!event.isPrimary || event.pointerType !== "touch" || dialog || swipeTimer.current !== undefined) return;
     if (event.clientX < 20 || event.clientX > window.innerWidth - 20) return;
     if (!(event.target instanceof Element) || event.target.closest("button, a, input, select, textarea, label, [contenteditable]")) return;
-    swipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY, horizontal: false };
+    const viewport = swipeViewport.current;
+    if (!viewport) return;
+    swipe.current = {
+      id: event.pointerId, x: event.clientX, y: event.clientY, distance: 0, width: viewport.clientWidth, horizontal: false,
+    };
   }
 
   function clearSwipePreview() {
     window.clearTimeout(swipeTimer.current);
     swipeTimer.current = undefined;
+    finishSlide.current = null;
     const viewport = swipeViewport.current;
     if (viewport) {
       delete viewport.dataset.settling;
@@ -452,6 +465,10 @@ export default function Home() {
     const start = swipe.current;
     if (!start) return;
     swipe.current = null;
+    if (swipeFrame.current !== undefined) {
+      window.cancelAnimationFrame(swipeFrame.current);
+      swipeFrame.current = undefined;
+    }
     const bar = bottomNav.current;
     if (bar) {
       delete bar.dataset.swiping;
@@ -475,8 +492,9 @@ export default function Home() {
       return;
     }
     viewport.dataset.settling = "";
-    viewport.style.setProperty("--page-offset", next ? `${direction * (viewport.clientWidth + 10)}px` : "0px");
-    swipeTimer.current = window.setTimeout(complete, 220);
+    viewport.style.setProperty("--page-offset", next ? `${direction * (start.width + 10)}px` : "0px");
+    finishSlide.current = complete;
+    swipeTimer.current = window.setTimeout(complete, 240);
   }
 
   function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
@@ -488,6 +506,7 @@ export default function Home() {
       if (Math.abs(dy) > 12 && Math.abs(dy) >= Math.abs(dx)) return settleSwipe();
       if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
       start.horizontal = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
     }
     const direction = dx < 0 ? 1 : -1;
     const index = nav.findIndex(({ label }) => label === view);
@@ -496,15 +515,19 @@ export default function Home() {
       start.preview = next;
       setSwipePreview(next ? { view: next, direction } : null);
     }
-    const viewport = swipeViewport.current;
-    if (viewport) viewport.style.setProperty("--page-offset",
-      `${next ? -direction * Math.min(Math.abs(dx), viewport.clientWidth + 10) : 0}px`);
-    const bar = bottomNav.current;
-    if (!bar) return;
-    const offset = next ? Math.min(Math.abs(dx) * .42, 64) : 0;
-    bar.dataset.swiping = "";
-    bar.style.setProperty("--swipe-offset", `${-Math.sign(dx) * offset}px`);
-    bar.style.setProperty("--swipe-stretch", String(1 + offset / 400));
+    start.distance = next ? -direction * Math.min(Math.abs(dx), start.width + 10) : 0;
+    if (swipeFrame.current !== undefined) return;
+    swipeFrame.current = window.requestAnimationFrame(() => {
+      swipeFrame.current = undefined;
+      if (swipe.current !== start) return;
+      swipeViewport.current?.style.setProperty("--page-offset", `${start.distance}px`);
+      const bar = bottomNav.current;
+      if (!bar) return;
+      const offset = Math.min(Math.abs(start.distance) * .42, 64);
+      bar.dataset.swiping = "";
+      bar.style.setProperty("--swipe-offset", `${-Math.sign(start.distance) * offset}px`);
+      bar.style.setProperty("--swipe-stretch", String(1 + offset / 400));
+    });
   }
 
   function finishSwipe(event: ReactPointerEvent<HTMLDivElement>) {
@@ -824,13 +847,16 @@ export default function Home() {
         </header>
 
         <div className="content" onPointerDown={startSwipe} onPointerMove={moveSwipe}
-          onPointerUp={finishSwipe} onPointerCancel={() => settleSwipe()}>
+          onPointerUp={finishSwipe}
+          onPointerCancel={(event) => { if (swipe.current?.id === event.pointerId) settleSwipe(); }}>
           {sharedError?.actor === userId && sharedError && <p role="status" className="dialog-description">{sharedUnavailable
             ? "Las invitaciones aún no están activadas. Puedes seguir usando tus deudas locales."
             : "No se pudieron cargar las deudas compartidas."}</p>}
           {invite && dialog !== "invite" && <button className="secondary invitation-button" onClick={() => setDialog("invite")}>Abrir invitación pendiente</button>}
           <div className="swipe-viewport" ref={swipeViewport} data-preview={Boolean(swipePreview)}>
-            <div className="view-content" key={view} data-direction={viewDirection}>
+            <div className="view-content" key={view} data-direction={viewDirection} onTransitionEnd={(event) => {
+              if (event.target === event.currentTarget && event.propertyName === "transform") finishSlide.current?.();
+            }}>
               {renderView(view)}
             </div>
             {swipePreview && <div className="swipe-preview" data-side={swipePreview.direction > 0 ? "right" : "left"} inert aria-hidden="true">

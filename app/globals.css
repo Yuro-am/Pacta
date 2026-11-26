@@ -401,19 +401,20 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 780; letter-spacing: -.05
 .swipe-viewport[data-preview="true"] { overflow: clip; }
 .swipe-viewport[data-preview="true"] > .view-content {
   animation: none;
-  transform: translateX(var(--page-offset, 0px));
+  transform: translate3d(var(--page-offset, 0px), 0, 0);
 }
 .swipe-preview {
   position: absolute;
   top: 0;
   inset-inline: 0;
   pointer-events: none;
-  transform: translateX(calc(var(--preview-start) + var(--page-offset, 0px)));
+  transform: translate3d(calc(var(--preview-start) + var(--page-offset, 0px)), 0, 0);
 }
+.swipe-viewport[data-preview="true"] > :is(.view-content, .swipe-preview) { will-change: transform; }
 .swipe-preview[data-side="right"] { --preview-start: 100% + 10px; }
 .swipe-preview[data-side="left"] { --preview-start: -100% - 10px; }
 .swipe-viewport[data-settling] > :is(.view-content, .swipe-preview) {
-  transition: transform 220ms cubic-bezier(.2, .75, .25, 1);
+  transition: transform 190ms cubic-bezier(.2, .75, .25, 1);
 }
 .view-content[data-direction] { animation: enter-view 350ms cubic-bezier(.2, .75, .25, 1); }
 .view-content[data-direction="forward"] { --view-entry: 14px; }
