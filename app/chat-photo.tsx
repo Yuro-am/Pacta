@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, ImagePlus, Image as ImageIcon, SwitchCamera } from "lucide-react";
+import { Camera, ImagePlus, Image as ImageIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { createClient } from "../utils/supabase/client";
 
@@ -13,8 +13,7 @@ export function PhotoComposer({ sending, send }: {
   send: (photo: PhotoAttachment) => Promise<boolean>;
 }) {
   const chooser = useRef<HTMLInputElement>(null);
-  const rearCamera = useRef<HTMLInputElement>(null);
-  const frontCamera = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState<PhotoAttachment | null>(null);
   const [preview, setPreview] = useState("");
   const [error, setError] = useState("");
@@ -37,17 +36,13 @@ export function PhotoComposer({ sending, send }: {
   }
 
   return <div className="photo-composer">
-    <input className="sr-only" type="file" ref={rearCamera} tabIndex={-1} aria-label="Foto de la cámara trasera"
+    <input className="sr-only" type="file" ref={camera} tabIndex={-1} aria-label="Foto de la cámara"
       accept="image/*" capture="environment" disabled={sending} onChange={choosePhoto} />
-    <input className="sr-only" type="file" ref={frontCamera} tabIndex={-1} aria-label="Foto de la cámara delantera"
-      accept="image/*" capture="user" disabled={sending} onChange={choosePhoto} />
     <input className="sr-only" type="file" ref={chooser} tabIndex={-1} aria-label="Seleccionar archivo de foto"
       accept={Object.keys(formats).join(",")} disabled={sending} onChange={choosePhoto} />
     {!photo ? <div className="photo-actions">
-      <button className="icon-button" type="button" disabled={sending} onClick={() => rearCamera.current?.click()}
-        aria-label="Cámara trasera" title="Cámara trasera"><Camera size={19} /></button>
-      <button className="icon-button" type="button" disabled={sending} onClick={() => frontCamera.current?.click()}
-        aria-label="Cámara delantera" title="Cámara delantera"><SwitchCamera size={19} /></button>
+      <button className="icon-button" type="button" disabled={sending} onClick={() => camera.current?.click()}
+        aria-label="Abrir cámara" title="Abrir cámara"><Camera size={19} /></button>
       <button className="icon-button" type="button" disabled={sending} onClick={() => chooser.current?.click()}
         aria-label="Adjuntar foto" title="Adjuntar foto"><ImagePlus size={19} /></button>
     </div>

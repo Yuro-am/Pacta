@@ -726,7 +726,7 @@ export default function Home() {
         <button onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
 
-      {((dialog && dialog !== "messages") || active || trashDebt || (chatTarget && client && userId)) && <Modal close={() => {
+      {((dialog && dialog !== "messages") || active || trashDebt || (chatTarget && client && userId)) && <Modal explicitClose={Boolean(chatTarget)} close={() => {
         setDialog(null); setSelected(null); setChatTarget(null); setTrashPrompt(null); setTrashError("");
       }}>
         {trashPrompt && trashDebt ? <>
@@ -782,7 +782,7 @@ export default function Home() {
   );
 }
 
-function Modal({ children, close }: { children: React.ReactNode; close: () => void }) {
+function Modal({ children, close, explicitClose = false }: { children: React.ReactNode; close: () => void; explicitClose?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -793,8 +793,8 @@ function Modal({ children, close }: { children: React.ReactNode; close: () => vo
 
   return <dialog ref={ref}
     className="modal" aria-labelledby="dialog-title"
-    onCancel={(event) => { event.preventDefault(); close(); }}
-    onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
+    onCancel={(event) => { event.preventDefault(); if (!explicitClose) close(); }}
+    onClick={(event) => { if (!explicitClose && event.target === event.currentTarget) close(); }}>
     <div className="modal-content">
       <button className="icon-button close" onClick={close} aria-label="Cerrar"><X size={21} /></button>
       {children}

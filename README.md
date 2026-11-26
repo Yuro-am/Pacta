@@ -118,7 +118,7 @@ Tras activar los audios, ejecuta [202611220012_group_chat.sql](supabase/migratio
 
 ### Fotos en el chat
 
-Tras activar el chat de grupo y las notas de voz, ejecuta [202611220013_chat_photos.sql](supabase/migrations/202611220013_chat_photos.sql). En un chat privado o de grupo, pulsa **Cámara trasera** o **Cámara delantera** para tomar una foto o **Adjuntar foto** para elegir un archivo. Revisa la vista previa antes de enviarla. Se admiten JPG, PNG, WebP y GIF de hasta 8 MB. Las descargas requieren acceso al chat.
+Tras activar el chat de grupo y las notas de voz, ejecuta [202611220013_chat_photos.sql](supabase/migrations/202611220013_chat_photos.sql). En un chat privado o de grupo, pulsa **Abrir cámara** para tomar una foto o **Adjuntar foto** para elegir un archivo. Revisa la vista previa antes de enviarla. Se admiten JPG, PNG, WebP y GIF de hasta 8 MB. Las descargas requieren acceso al chat.
 
 ### Mensajes y solicitudes en tiempo real
 
