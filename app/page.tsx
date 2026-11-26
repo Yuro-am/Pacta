@@ -55,13 +55,21 @@ export default function Home() {
   const bottomNav = useRef<HTMLElement>(null);
   const swipeViewport = useRef<HTMLDivElement>(null);
   const swipeTrack = useRef<HTMLDivElement>(null);
-  const [swipePreview, setSwipePreview] = useState<{ view: View; direction: number } | null>(null);
+  const viewIndex = nav.findIndex(({ label }) => label === view);
+  const [touchNavigation, setTouchNavigation] = useState(false);
   const swipeTimer = useRef<number | undefined>(undefined);
   const swipeFrame = useRef<number | undefined>(undefined);
   const finishSlide = useRef<(() => void) | null>(null);
-  useEffect(() => () => {
-    window.clearTimeout(swipeTimer.current);
-    if (swipeFrame.current !== undefined) window.cancelAnimationFrame(swipeFrame.current);
+  useEffect(() => {
+    const touch = window.matchMedia("(any-pointer: coarse)");
+    function updateTouchNavigation() { setTouchNavigation(touch.matches); }
+    updateTouchNavigation();
+    touch.addEventListener("change", updateTouchNavigation);
+    return () => {
+      touch.removeEventListener("change", updateTouchNavigation);
+      window.clearTimeout(swipeTimer.current);
+      if (swipeFrame.current !== undefined) window.cancelAnimationFrame(swipeFrame.current);
+    };
   }, []);
   const swipe = useRef<{
     id: number; x: number; y: number; distance: number; width: number; horizontal: boolean; preview?: View;
@@ -439,9 +447,9 @@ export default function Home() {
   }
 
   function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!event.isPrimary || event.pointerType !== "touch" || dialog || swipeTimer.current !== undefined) return;
+    if (!touchNavigation || !event.isPrimary || event.pointerType !== "touch" || dialog || swipeTimer.current !== undefined) return;
     if (event.clientX < 20 || event.clientX > window.innerWidth - 20) return;
-    if (!(event.target instanceof Element) || event.target.closest("button, a, input, select, textarea, label, [contenteditable]")) return;
+    if (!(event.target instanceof Element) || event.target.closest(".can-trash, input, select, textarea, label, [contenteditable]")) return;
     const viewport = swipeViewport.current;
     if (!viewport) return;
     swipe.current = {
@@ -456,6 +464,7 @@ export default function Home() {
     const viewport = swipeViewport.current;
     if (viewport) {
       delete viewport.dataset.settling;
+      delete viewport.dataset.preview;
     }
     swipeTrack.current?.style.removeProperty("transform");
     const bar = bottomNav.current;
@@ -463,7 +472,6 @@ export default function Home() {
       delete bar.dataset.sliding;
       bar.style.removeProperty("--swipe-offset");
     }
-    setSwipePreview(null);
   }
 
   function settleSwipe(next?: View, direction = 0) {
@@ -496,15 +504,16 @@ export default function Home() {
       clearSwipePreview();
       if (next) navigate(next, false);
     };
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (!viewport.dataset.preview || (next && viewport.dataset.preview !== (direction < 0 ? "right" : "left"))
+      || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       complete();
       return;
     }
     viewport.dataset.settling = "";
-    const destination = next ? direction * (start.width + 10) : 0;
+    const destination = next ? direction * start.width : 0;
     track.style.transform = `translate3d(${destination}px, 0, 0)`;
     finishSlide.current = complete;
-    swipeTimer.current = window.setTimeout(complete, 210);
+    swipeTimer.current = window.setTimeout(complete, 180);
   }
 
   function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
@@ -514,22 +523,23 @@ export default function Home() {
     const dy = event.clientY - start.y;
     if (!start.horizontal) {
       if (Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) return settleSwipe();
-      if (Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      if (Math.abs(dx) < 4 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
       start.horizontal = true;
       event.currentTarget.setPointerCapture(event.pointerId);
     }
     const direction = dx < 0 ? 1 : -1;
-    const index = nav.findIndex(({ label }) => label === view);
-    const next = nav[index + direction]?.label;
-    if (next !== start.preview) {
-      start.preview = next;
-      setSwipePreview(next ? { view: next, direction } : null);
-    }
-    start.distance = next ? -direction * Math.min(Math.abs(dx), start.width + 10) : 0;
+    const next = nav[viewIndex + direction]?.label;
+    start.preview = next;
+    start.distance = next ? -direction * Math.min(Math.abs(dx), start.width) : 0;
     if (swipeFrame.current !== undefined) return;
     swipeFrame.current = window.requestAnimationFrame(() => {
       swipeFrame.current = undefined;
       if (swipe.current !== start) return;
+      const viewport = swipeViewport.current;
+      if (viewport) {
+        if (start.preview) viewport.dataset.preview = start.distance < 0 ? "right" : "left";
+        else delete viewport.dataset.preview;
+      }
       const track = swipeTrack.current;
       if (track) track.style.transform = `translate3d(${start.distance}px, 0, 0)`;
       const bar = bottomNav.current;
@@ -546,11 +556,9 @@ export default function Home() {
     const start = swipe.current;
     if (!start || start.id !== event.pointerId) return;
     const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
     const direction = Math.sign(dx);
-    const index = nav.findIndex(({ label }) => label === view);
-    const next = nav[index - direction]?.label;
-    if (!start.horizontal || Math.abs(dx) < 28 || Math.abs(dx) < Math.abs(dy) * 1.2 || next !== start.preview) {
+    const next = nav[viewIndex - direction]?.label;
+    if (!start.horizontal || Math.abs(dx) < 20 || next !== start.preview) {
       settleSwipe();
     } else {
       settleSwipe(next, direction);
@@ -865,16 +873,19 @@ export default function Home() {
             ? "Las invitaciones aún no están activadas. Puedes seguir usando tus deudas locales."
             : "No se pudieron cargar las deudas compartidas."}</p>}
           {invite && dialog !== "invite" && <button className="secondary invitation-button" onClick={() => setDialog("invite")}>Abrir invitación pendiente</button>}
-          <div className="swipe-viewport" ref={swipeViewport} data-preview={Boolean(swipePreview)}>
+          <div className="swipe-viewport" ref={swipeViewport}>
             <div className="swipe-track" ref={swipeTrack} onTransitionEnd={(event) => {
               if (event.target === event.currentTarget && event.propertyName === "transform") finishSlide.current?.();
             }}>
               <div className="view-content" key={view} data-direction={viewDirection}>
                 {renderView(view)}
               </div>
-              {swipePreview && <div className="swipe-preview" data-side={swipePreview.direction > 0 ? "right" : "left"} inert aria-hidden="true">
-                {renderView(swipePreview.view, true)}
-              </div>}
+              {touchNavigation && [-1, 1].map((direction) => {
+                const neighbor = nav[viewIndex + direction];
+                return neighbor && <div key={neighbor.label} className="swipe-preview" data-side={direction > 0 ? "right" : "left"} inert aria-hidden="true">
+                  {renderView(neighbor.label, true)}
+                </div>;
+              })}
             </div>
           </div>
         </div>
