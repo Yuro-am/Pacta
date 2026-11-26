@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronDown, ChevronRight,
   CircleDollarSign, CircleHelp, Coffee, Gift, HandHeart, House, LayoutGrid, List, Pizza,
@@ -51,6 +51,9 @@ function canTrash(debt: Debt) {
 
 export default function Home() {
   const [view, setView] = useState<View>("Inicio");
+  const [viewDirection, setViewDirection] = useState<"forward" | "backward">();
+  const bottomNav = useRef<HTMLElement>(null);
+  const swipe = useRef<{ id: number; x: number; y: number; horizontal: boolean } | null>(null);
   const [localDebts, setLocalDebts] = useState<Debt[]>([]);
   const [shared, setShared] = useState<{ actor: string; debts: Debt[]; signature?: string } | null>(null);
   const [socialState, setSocialState] = useState<{ actor: string; data: SocialData; signature: string } | null>(null);
@@ -411,10 +414,61 @@ export default function Home() {
   }
 
   function navigate(next: View) {
+    if (next !== view) {
+      setViewDirection(nav.findIndex(({ label }) => label === next) > nav.findIndex(({ label }) => label === view)
+        ? "forward" : "backward");
+    }
     setView(next);
     setGroup(null);
     setFilter("Todo");
     if (next === "Social") void refreshSocial();
+  }
+
+  function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary || event.pointerType !== "touch" || dialog) return;
+    if (event.clientX < 20 || event.clientX > window.innerWidth - 20) return;
+    if (!(event.target instanceof Element) || event.target.closest("button, a, input, select, textarea, label, [contenteditable]")) return;
+    swipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY, horizontal: false };
+  }
+
+  function resetSwipe() {
+    swipe.current = null;
+    const bar = bottomNav.current;
+    if (!bar) return;
+    delete bar.dataset.swiping;
+    bar.style.removeProperty("--swipe-offset");
+    bar.style.removeProperty("--swipe-stretch");
+  }
+
+  function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+    const start = swipe.current;
+    if (!start || start.id !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (!start.horizontal) {
+      if (Math.abs(dy) > 12 && Math.abs(dy) >= Math.abs(dx)) return resetSwipe();
+      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      start.horizontal = true;
+    }
+    const bar = bottomNav.current;
+    if (!bar) return;
+    const atEdge = (view === "Inicio" && dx > 0) || (view === "Actividad" && dx < 0);
+    const offset = atEdge ? 0 : Math.min(Math.abs(dx) * .42, 64);
+    bar.dataset.swiping = "";
+    bar.style.setProperty("--swipe-offset", `${-Math.sign(dx) * offset}px`);
+    bar.style.setProperty("--swipe-stretch", String(1 + offset / 400));
+  }
+
+  function finishSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+    const start = swipe.current;
+    if (!start || start.id !== event.pointerId) return;
+    resetSwipe();
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (!start.horizontal || Math.abs(dx) < 52 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const current = nav.findIndex(({ label }) => label === view);
+    const next = nav[current + (dx < 0 ? 1 : -1)];
+    if (next) navigate(next.label);
   }
 
   async function addDebt(form: FormData, split?: GroupSplit) {
@@ -640,12 +694,13 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="content">
+        <div className="content" onPointerDown={startSwipe} onPointerMove={moveSwipe}
+          onPointerUp={finishSwipe} onPointerCancel={resetSwipe}>
           {sharedError?.actor === userId && sharedError && <p role="status" className="dialog-description">{sharedUnavailable
             ? "Las invitaciones aún no están activadas. Puedes seguir usando tus deudas locales."
             : "No se pudieron cargar las deudas compartidas."}</p>}
           {invite && dialog !== "invite" && <button className="secondary invitation-button" onClick={() => setDialog("invite")}>Abrir invitación pendiente</button>}
-          <div className="view-content" key={view}>
+          <div className="view-content" key={view} data-direction={viewDirection}>
           {view === "Inicio" ? <>
             <div className="page-heading">
               <div><h1>¡Hola, {firstName}!</h1></div>
@@ -719,7 +774,7 @@ export default function Home() {
         </div>
       </main>
 
-      <nav className="bottom-nav" aria-label="Navegación móvil">
+      <nav ref={bottomNav} className="bottom-nav" aria-label="Navegación móvil">
         <button onClick={() => navigate("Inicio")} aria-current={view === "Inicio" ? "page" : undefined} className={view === "Inicio" ? "bottom-active" : ""}><LayoutGrid size={21} /> Inicio</button>
         <button onClick={() => navigate("Social")} aria-current={view === "Social" ? "page" : undefined} className={view === "Social" ? "bottom-active" : ""}><UsersRound size={21} /> Social{pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}</button>
         <button className="bottom-add" onClick={() => setDialog("new")}><span><Plus size={22} /></span> Añadir</button>
