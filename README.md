@@ -68,7 +68,7 @@ PACTA empieza con el saldo a cero para quienes aún no registraron deudas. Los m
 
 En móvil, mantén pulsada una deuda o deslízala hacia un lado para abrir la confirmación. También puedes abrir su detalle y pulsar **Mover a la papelera**. En **Actividad → Papelera** puedes restaurar una deuda o confirmar su borrado definitivo.
 
-Puedes retirar las deudas compartidas que creaste mientras estén pendientes o en propuesta. Al retirarlas salen de la actividad y de los saldos de ambas partes. Para activar la papelera de deudas compartidas, abre **SQL Editor → New query** en Supabase, pega el contenido completo de [202611220015_debt_trash.sql](supabase/migrations/202611220015_debt_trash.sql) y pulsa **Run**.
+Puedes retirar las deudas compartidas que creaste si están pendientes, en propuesta o saldadas. Para habilitar la papelera de deudas saldadas, aplica [202611220019_allow_settled_debt_trash.sql](supabase/migrations/202611220019_allow_settled_debt_trash.sql) después de la migración inicial de la papelera. Al retirarlas salen de la actividad y de los saldos de ambas partes. Para activar la papelera de deudas compartidas, abre **SQL Editor → New query** en Supabase, pega el contenido completo de [202611220015_debt_trash.sql](supabase/migrations/202611220015_debt_trash.sql) y pulsa **Run**.
 
 ## Añadir amigos y crear grupos
 

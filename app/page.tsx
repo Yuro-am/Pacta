@@ -46,7 +46,7 @@ const avatars = ["#e8dcff", "#ffdfcf", "#dcf2e7", "#ffdced"];
 type TrashAction = "trash" | "restore" | "purge";
 
 function canTrash(debt: Debt) {
-  return !debt.shared || (debt.shared.owned && ["Pendiente", "Propuesta"].includes(debt.stage));
+  return !debt.shared || (debt.shared.owned && ["Pendiente", "Propuesta", "Saldada"].includes(debt.stage));
 }
 
 export default function Home() {
