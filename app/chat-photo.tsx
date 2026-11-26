@@ -1,7 +1,7 @@
 "use client";
 
-import { Camera, ImagePlus, Image as ImageIcon, SwitchCamera, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Camera, ImagePlus, Image as ImageIcon, SwitchCamera } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { createClient } from "../utils/supabase/client";
 
 const formats = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" } as const;
@@ -13,94 +13,11 @@ export function PhotoComposer({ sending, send }: {
   send: (photo: PhotoAttachment) => Promise<boolean>;
 }) {
   const chooser = useRef<HTMLInputElement>(null);
-  const cameraDialog = useRef<HTMLDialogElement>(null);
-  const video = useRef<HTMLVideoElement>(null);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [facing, setFacing] = useState<"environment" | "user">("environment");
-  const [cameraError, setCameraError] = useState("");
-  const [switching, setSwitching] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
-  const [capturing, setCapturing] = useState(false);
+  const rearCamera = useRef<HTMLInputElement>(null);
+  const frontCamera = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState<PhotoAttachment | null>(null);
   const [preview, setPreview] = useState("");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!cameraOpen) return;
-    const dialog = cameraDialog.current;
-    dialog?.showModal();
-    return () => dialog?.close();
-  }, [cameraOpen]);
-
-  useEffect(() => {
-    if (!photo) return;
-    const url = URL.createObjectURL(photo.blob);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
-
-  useEffect(() => {
-    const player = video.current;
-    if (!cameraOpen || !player) return;
-    let closed = false;
-    let stream: MediaStream | undefined;
-
-    async function openCamera(player: HTMLVideoElement) {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: switching ? { exact: facing } : { ideal: facing } },
-        });
-        if (closed) stream.getTracks().forEach((track) => track.stop());
-        else player.srcObject = stream;
-      } catch {
-        if (closed) return;
-        setCameraError(switching
-          ? "No se pudo abrir esa cámara. Puedes volver a cambiar."
-          : "No se pudo abrir la cámara. Revisa el permiso del navegador.");
-      }
-    }
-
-    void openCamera(player);
-    return () => {
-      closed = true;
-      stream?.getTracks().forEach((track) => track.stop());
-      player.srcObject = null;
-    };
-  }, [cameraOpen, facing, switching]);
-
-  function changeCamera() {
-    const current = (video.current?.srcObject as MediaStream | null)?.getVideoTracks()[0]?.getSettings().facingMode;
-    setCameraReady(false);
-    setCameraError("");
-    setSwitching(true);
-    setFacing((current ?? facing) === "user" ? "environment" : "user");
-  }
-
-  async function takePhoto() {
-    const player = video.current;
-    if (!player?.videoWidth || !player.videoHeight || capturing) return;
-    setCapturing(true);
-    try {
-      const canvas = document.createElement("canvas");
-      const scale = Math.min(1, 2048 / Math.max(player.videoWidth, player.videoHeight));
-      canvas.width = Math.round(player.videoWidth * scale);
-      canvas.height = Math.round(player.videoHeight * scale);
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Canvas unavailable");
-      // Save the same unmirrored frame shown in the preview.
-      context.drawImage(player, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-      if (!blob) throw new Error("Photo unavailable");
-      setPreview("");
-      setPhoto({ id: crypto.randomUUID(), blob, extension: "jpg" });
-      setCameraOpen(false);
-    } catch {
-      setCameraError("No se pudo tomar la foto. Inténtalo de nuevo.");
-    } finally {
-      setCapturing(false);
-    }
-  }
 
   function choose(file?: File) {
     if (!file) return;
@@ -114,45 +31,26 @@ export function PhotoComposer({ sending, send }: {
     setPhoto({ id: crypto.randomUUID(), blob: file, extension });
   }
 
+  function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
+    choose(event.currentTarget.files?.[0]);
+    event.currentTarget.value = "";
+  }
+
   return <div className="photo-composer">
+    <input className="sr-only" type="file" ref={rearCamera} tabIndex={-1} aria-label="Foto de la cámara trasera"
+      accept="image/*" capture="environment" disabled={sending} onChange={choosePhoto} />
+    <input className="sr-only" type="file" ref={frontCamera} tabIndex={-1} aria-label="Foto de la cámara delantera"
+      accept="image/*" capture="user" disabled={sending} onChange={choosePhoto} />
     <input className="sr-only" type="file" ref={chooser} tabIndex={-1} aria-label="Seleccionar archivo de foto"
-      accept={Object.keys(formats).join(",")} disabled={sending} onChange={(event) => {
-        choose(event.currentTarget.files?.[0]);
-        event.currentTarget.value = "";
-      }} />
-    {cameraOpen && <dialog ref={cameraDialog} className="chat-camera" aria-label="Cámara"
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!capturing) setCameraOpen(false);
-      }}>
-      <button className="camera-close icon-button" type="button" aria-label="Cerrar cámara" disabled={capturing}
-        onClick={() => setCameraOpen(false)}><X size={22} /></button>
-      <div className="camera-view">
-        <video key={facing} ref={video} autoPlay playsInline muted aria-label="Vista previa de la cámara"
-          onCanPlay={() => setCameraReady(true)} />
-        {cameraError ? <p className="camera-status" role="alert">{cameraError}</p>
-          : !cameraReady && <p className="camera-status" role="status">Abriendo cámara…</p>}
-      </div>
-      <div className="camera-controls">
-        <button className="camera-shutter" type="button" aria-label="Tomar foto" disabled={!cameraReady || capturing || sending}
-          onClick={() => void takePhoto()}><Camera size={26} /></button>
-        <button className="camera-switch icon-button" type="button" aria-label="Cambiar cámara" title="Cambiar cámara"
-          disabled={capturing || (!cameraReady && !cameraError)} onClick={changeCamera}><SwitchCamera size={23} /></button>
-      </div>
-    </dialog>}
+      accept={Object.keys(formats).join(",")} disabled={sending} onChange={choosePhoto} />
     {!photo ? <div className="photo-actions">
-        <button className="icon-button" type="button" disabled={sending} aria-label="Abrir cámara" title="Abrir cámara"
-          onClick={() => {
-            setError("");
-            setCameraError("");
-            setCameraReady(false);
-            setSwitching(false);
-            setFacing("environment");
-            setCameraOpen(true);
-          }}><Camera size={19} /></button>
-        <button className="icon-button" type="button" disabled={sending} onClick={() => chooser.current?.click()}
-          aria-label="Adjuntar foto" title="Adjuntar foto"><ImagePlus size={19} /></button>
-      </div>
+      <button className="icon-button" type="button" disabled={sending} onClick={() => rearCamera.current?.click()}
+        aria-label="Cámara trasera" title="Cámara trasera"><Camera size={19} /></button>
+      <button className="icon-button" type="button" disabled={sending} onClick={() => frontCamera.current?.click()}
+        aria-label="Cámara delantera" title="Cámara delantera"><SwitchCamera size={19} /></button>
+      <button className="icon-button" type="button" disabled={sending} onClick={() => chooser.current?.click()}
+        aria-label="Adjuntar foto" title="Adjuntar foto"><ImagePlus size={19} /></button>
+    </div>
       : <div className="photo-draft">
         {preview && <img src={preview} alt="Vista previa de la foto" onError={() => { setPhoto(null); setError("No se pudo abrir esta imagen."); }} />}
         <div className="dialog-actions">
