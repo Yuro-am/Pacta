@@ -54,6 +54,7 @@ export default function Home() {
   const [viewDirection, setViewDirection] = useState<"forward" | "backward">();
   const bottomNav = useRef<HTMLElement>(null);
   const swipeViewport = useRef<HTMLDivElement>(null);
+  const swipeTrack = useRef<HTMLDivElement>(null);
   const [swipePreview, setSwipePreview] = useState<{ view: View; direction: number } | null>(null);
   const swipeTimer = useRef<number | undefined>(undefined);
   const swipeFrame = useRef<number | undefined>(undefined);
@@ -455,9 +456,13 @@ export default function Home() {
     const viewport = swipeViewport.current;
     if (viewport) {
       delete viewport.dataset.settling;
-      viewport.style.removeProperty("--page-offset");
     }
-    bottomNav.current?.style.removeProperty("--swipe-offset");
+    swipeTrack.current?.style.removeProperty("transform");
+    const bar = bottomNav.current;
+    if (bar) {
+      delete bar.dataset.sliding;
+      bar.style.removeProperty("--swipe-offset");
+    }
     setSwipePreview(null);
   }
 
@@ -482,7 +487,11 @@ export default function Home() {
     }
 
     const viewport = swipeViewport.current;
-    if (!viewport || !start.preview) return;
+    const track = swipeTrack.current;
+    if (!viewport || !track || !start.preview) {
+      clearSwipePreview();
+      return;
+    }
     const complete = () => {
       clearSwipePreview();
       if (next) navigate(next, false);
@@ -492,9 +501,10 @@ export default function Home() {
       return;
     }
     viewport.dataset.settling = "";
-    viewport.style.setProperty("--page-offset", next ? `${direction * (start.width + 10)}px` : "0px");
+    const destination = next ? direction * (start.width + 10) : 0;
+    track.style.transform = `translate3d(${destination}px, 0, 0)`;
     finishSlide.current = complete;
-    swipeTimer.current = window.setTimeout(complete, 240);
+    swipeTimer.current = window.setTimeout(complete, 210);
   }
 
   function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
@@ -503,8 +513,8 @@ export default function Home() {
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
     if (!start.horizontal) {
-      if (Math.abs(dy) > 12 && Math.abs(dy) >= Math.abs(dx)) return settleSwipe();
-      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      if (Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) return settleSwipe();
+      if (Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
       start.horizontal = true;
       event.currentTarget.setPointerCapture(event.pointerId);
     }
@@ -520,11 +530,13 @@ export default function Home() {
     swipeFrame.current = window.requestAnimationFrame(() => {
       swipeFrame.current = undefined;
       if (swipe.current !== start) return;
-      swipeViewport.current?.style.setProperty("--page-offset", `${start.distance}px`);
+      const track = swipeTrack.current;
+      if (track) track.style.transform = `translate3d(${start.distance}px, 0, 0)`;
       const bar = bottomNav.current;
       if (!bar) return;
       const offset = Math.min(Math.abs(start.distance) * .42, 64);
       bar.dataset.swiping = "";
+      bar.toggleAttribute("data-sliding", Boolean(start.preview));
       bar.style.setProperty("--swipe-offset", `${-Math.sign(start.distance) * offset}px`);
       bar.style.setProperty("--swipe-stretch", String(1 + offset / 400));
     });
@@ -538,7 +550,7 @@ export default function Home() {
     const direction = Math.sign(dx);
     const index = nav.findIndex(({ label }) => label === view);
     const next = nav[index - direction]?.label;
-    if (!start.horizontal || Math.abs(dx) < 44 || Math.abs(dx) < Math.abs(dy) * 1.5 || next !== start.preview) {
+    if (!start.horizontal || Math.abs(dx) < 28 || Math.abs(dx) < Math.abs(dy) * 1.2 || next !== start.preview) {
       settleSwipe();
     } else {
       settleSwipe(next, direction);
@@ -854,14 +866,16 @@ export default function Home() {
             : "No se pudieron cargar las deudas compartidas."}</p>}
           {invite && dialog !== "invite" && <button className="secondary invitation-button" onClick={() => setDialog("invite")}>Abrir invitación pendiente</button>}
           <div className="swipe-viewport" ref={swipeViewport} data-preview={Boolean(swipePreview)}>
-            <div className="view-content" key={view} data-direction={viewDirection} onTransitionEnd={(event) => {
+            <div className="swipe-track" ref={swipeTrack} onTransitionEnd={(event) => {
               if (event.target === event.currentTarget && event.propertyName === "transform") finishSlide.current?.();
             }}>
-              {renderView(view)}
+              <div className="view-content" key={view} data-direction={viewDirection}>
+                {renderView(view)}
+              </div>
+              {swipePreview && <div className="swipe-preview" data-side={swipePreview.direction > 0 ? "right" : "left"} inert aria-hidden="true">
+                {renderView(swipePreview.view, true)}
+              </div>}
             </div>
-            {swipePreview && <div className="swipe-preview" data-side={swipePreview.direction > 0 ? "right" : "left"} inert aria-hidden="true">
-              {renderView(swipePreview.view, true)}
-            </div>}
           </div>
         </div>
       </main>
