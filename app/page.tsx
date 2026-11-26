@@ -28,7 +28,7 @@ import { ProfileDialog, useProfile } from "./profile";
 
 const nav = [
   { label: "Inicio", icon: LayoutGrid },
-  { label: "Grupos", icon: UsersRound },
+  { label: "Social", icon: UsersRound },
   { label: "Actividad", icon: ReceiptText },
 ] as const;
 type View = typeof nav[number]["label"];
@@ -153,7 +153,7 @@ export default function Home() {
     if (incoming || hasPendingInvitation) setDialog("invite");
     else {
       const notice = url.searchParams.get("aviso");
-      if (notice === "solicitudes") setView("Grupos");
+      if (notice === "solicitudes") setView("Social");
       if (notice === "notificaciones") setDialog("notifications");
       if (notice === "mensajes") setDialog("messages");
     }
@@ -414,7 +414,7 @@ export default function Home() {
     setView(next);
     setGroup(null);
     setFilter("Todo");
-    if (next === "Grupos") void refreshSocial();
+    if (next === "Social") void refreshSocial();
   }
 
   async function addDebt(form: FormData, split?: GroupSplit) {
@@ -546,7 +546,7 @@ export default function Home() {
   }
 
   function showGroup(name: string) {
-    navigate("Grupos");
+    navigate("Social");
     setGroup(name);
   }
 
@@ -596,7 +596,7 @@ export default function Home() {
           {nav.map(({ label, icon: Icon }) =>
             <button key={label} className={view === label ? "nav-active" : ""} onClick={() => navigate(label)} aria-current={view === label ? "page" : undefined}>
               <Icon size={19} />{label}
-              {label === "Grupos" && pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}
+              {label === "Social" && pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}
             </button>
           )}
         </nav>
@@ -666,9 +666,9 @@ export default function Home() {
                 {debtList(debts.slice(0, 4))}
               </section>
             </div>
-          </> : view === "Grupos" ? <>
+          </> : view === "Social" ? <>
             {group && <button className="back" onClick={() => setGroup(null)}>← Todos los grupos</button>}
-            <div className="page-heading"><div><h1>{groupName ?? "Amigos y grupos"}</h1><p>{group ? "Las cuentas de vuestro grupo, en un solo lugar." : "Compartid planes y llevad las cuentas al día."}</p></div>
+            <div className="page-heading"><div><h1>{groupName ?? "Social"}</h1><p>{group ? "Las cuentas de vuestro grupo, en un solo lugar." : "Compartid planes y llevad las cuentas al día."}</p></div>
             <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button></div>
             {groupName ? <>
               {realGroup?.owner && <button className="danger invitation-button" type="button"
@@ -721,7 +721,7 @@ export default function Home() {
 
       <nav className="bottom-nav" aria-label="Navegación móvil">
         <button onClick={() => navigate("Inicio")} aria-current={view === "Inicio" ? "page" : undefined} className={view === "Inicio" ? "bottom-active" : ""}><LayoutGrid size={21} /> Inicio</button>
-        <button onClick={() => navigate("Grupos")} aria-current={view === "Grupos" ? "page" : undefined} className={view === "Grupos" ? "bottom-active" : ""}><UsersRound size={21} /> Grupos{pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}</button>
+        <button onClick={() => navigate("Social")} aria-current={view === "Social" ? "page" : undefined} className={view === "Social" ? "bottom-active" : ""}><UsersRound size={21} /> Social{pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}</button>
         <button className="bottom-add" onClick={() => setDialog("new")}><span><Plus size={22} /></span> Añadir</button>
         <button onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
@@ -775,7 +775,7 @@ export default function Home() {
         </> : dialog === "notifications" ? <Notifications deviceSettings={client && userId ? <MobilePush key={userId} client={client} userId={userId} /> : undefined} pending={unread} requests={pendingSocial} proposals={proposals}
           messages={inbox?.conversations.filter((item) => item.unread_count > 0) ?? []} notices={notices}
           openChat={openChat} openDebt={openDebtNotice} openProposal={openProposal} markRead={markDebtNotices}
-          openRequests={() => { setDialog(null); navigate("Grupos"); }} /> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={(debt) => confirmTrash(debt, "trash")} busy={busy} shareInvitation={shareInvitation} />}
+          openRequests={() => { setDialog(null); navigate("Social"); }} /> : active && <DebtDetail key={active.id} debt={active} update={updateDebt} remove={(debt) => confirmTrash(debt, "trash")} busy={busy} shareInvitation={shareInvitation} />}
       </Modal>}
       <div role="status" className={message ? "toast shown" : "toast"}>{message && <><Check size={17} />{message}</>}</div>
     </div>

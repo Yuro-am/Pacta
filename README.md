@@ -74,9 +74,9 @@ Puedes retirar las deudas compartidas que creaste mientras estén pendientes o e
 
 En Supabase, ejecuta [202611220003_friends_and_groups.sql](supabase/migrations/202611220003_friends_and_groups.sql) una vez después de la migración inicial de deudas.
 
-En PACTA, inicia sesión y abre **Grupos**. Escribe el nombre de usuario exacto de la otra persona, con o sin `@`, envía una solicitud y pídele que pulse **Aceptar** en su sección **Amigos**. A partir de entonces puedes seleccionar a esa persona al registrar una deuda. La verá en **Actividad** desde su cuenta.
+En PACTA, inicia sesión y abre **Social**. Escribe el nombre de usuario exacto de la otra persona, con o sin `@`, envía una solicitud y pídele que pulse **Aceptar** en su sección **Amigos**. A partir de entonces puedes seleccionar a esa persona al registrar una deuda. La verá en **Actividad** desde su cuenta.
 
-En **Grupos**, crea un grupo, ábrelo y selecciona a un amigo para invitarlo. La otra persona acepta desde esa misma sección. Para añadir una deuda al grupo, ábrelo y pulsa **Nueva deuda** o **Añadir**. Una deuda sigue siendo privada entre las dos personas implicadas, incluso dentro de un grupo.
+En **Social**, crea un grupo, ábrelo y selecciona a un amigo para invitarlo. La otra persona acepta desde esa misma sección. Para añadir una deuda al grupo, ábrelo y pulsa **Nueva deuda** o **Añadir**. Una deuda sigue siendo privada entre las dos personas implicadas, incluso dentro de un grupo.
 
 ## Chat entre amigos
 
@@ -96,11 +96,11 @@ En Supabase, abre **Authentication → Sign In / Providers → Email**, desactiv
 
 ## Repartir una deuda entre todo un grupo
 
-Ejecuta [202611220007_group_debt_split.sql](supabase/migrations/202611220007_group_debt_split.sql) en Supabase después de activar Amigos y Grupos. En **Nueva deuda**, selecciona **Registrar para → Todo un grupo**, elige el grupo e introduce el importe total. PACTA muestra cuánto corresponde a cada miembro que ya aceptó formar parte del grupo. Si el importe incluye tu parte, deja marcada **Incluir mi parte en el reparto**. Cada uno de los demás miembros recibe su deuda en su cuenta. El contador de **Grupos** muestra las solicitudes de amistad y las invitaciones de grupo pendientes.
+Ejecuta [202611220007_group_debt_split.sql](supabase/migrations/202611220007_group_debt_split.sql) en Supabase después de activar Amigos y Grupos. En **Nueva deuda**, selecciona **Registrar para → Todo un grupo**, elige el grupo e introduce el importe total. PACTA muestra cuánto corresponde a cada miembro que ya aceptó formar parte del grupo. Si el importe incluye tu parte, deja marcada **Incluir mi parte en el reparto**. Cada uno de los demás miembros recibe su deuda en su cuenta. El contador de **Social** muestra las solicitudes de amistad y las invitaciones de grupo pendientes.
 
 ## Saldo por persona en un grupo
 
-Ejecuta [202611220008_group_balances.sql](supabase/migrations/202611220008_group_balances.sql) en Supabase después de activar Amigos y Grupos. En **Grupos → Abrir**, la tabla **Saldo por persona** muestra lo que debe y lo que le deben a cada miembro dentro de ese grupo. Solo los miembros aceptados pueden consultar el resumen. La tabla cuenta las deudas pendientes entre miembros y excluye las saldadas. Cada movimiento individual sigue siendo visible únicamente para las dos cuentas implicadas.
+Ejecuta [202611220008_group_balances.sql](supabase/migrations/202611220008_group_balances.sql) en Supabase después de activar Amigos y Grupos. En **Social → Abrir**, la tabla **Saldo por persona** muestra lo que debe y lo que le deben a cada miembro dentro de ese grupo. Solo los miembros aceptados pueden consultar el resumen. La tabla cuenta las deudas pendientes entre miembros y excluye las saldadas. Cada movimiento individual sigue siendo visible únicamente para las dos cuentas implicadas.
 
 Para asignar importes distintos, ejecuta [202611220009_custom_group_split.sql](supabase/migrations/202611220009_custom_group_split.sql) después de la migración de reparto. En **Nueva deuda → Todo un grupo**, elige **Me deben** o **Yo debo**, selecciona **Importe por persona** y escribe lo que corresponde a cada miembro. Un importe de 0 € deja a esa persona fuera del reparto.
 
