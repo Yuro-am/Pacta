@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { flushSync } from "react-dom";
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronDown, ChevronRight,
   CircleDollarSign, CircleHelp, Coffee, Gift, HandHeart, House, LayoutGrid, List, Pizza,
@@ -433,17 +434,21 @@ export default function Home() {
     }
   }
 
-  function navigate(next: View, animate = true) {
-    if (swipe.current?.horizontal) return;
-    if (swipeTimer.current !== undefined) clearSwipePreview();
+  function selectView(next: View, animate: boolean) {
     if (next !== view) {
-      setViewDirection(!animate ? undefined : nav.findIndex(({ label }) => label === next) > nav.findIndex(({ label }) => label === view)
+      setViewDirection(!animate ? undefined : nav.findIndex(({ label }) => label === next) > viewIndex
         ? "forward" : "backward");
     }
     setView(next);
     setGroup(null);
     setFilter("Todo");
-    if (next === "Social") void refreshSocial();
+  }
+
+  function navigate(next: View) {
+    if (swipe.current?.horizontal) return;
+    if (swipeTimer.current !== undefined) clearSwipePreview();
+    selectView(next, true);
+    if (next === "Social" && next !== view) void refreshSocial();
   }
 
   function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
@@ -501,8 +506,10 @@ export default function Home() {
       return;
     }
     const complete = () => {
+      // Promote the visible pane before removing the track's final position.
+      if (next) flushSync(() => selectView(next, false));
       clearSwipePreview();
-      if (next) navigate(next, false);
+      if (next === "Social") void refreshSocial();
     };
     if (!viewport.dataset.preview || (next && viewport.dataset.preview !== (direction < 0 ? "right" : "left"))
       || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -537,7 +544,10 @@ export default function Home() {
       if (swipe.current !== start) return;
       const viewport = swipeViewport.current;
       if (viewport) {
-        if (start.preview) viewport.dataset.preview = start.distance < 0 ? "right" : "left";
+        if (start.preview) {
+          const side = start.distance < 0 ? "right" : "left";
+          if (viewport.dataset.preview !== side) viewport.dataset.preview = side;
+        }
         else delete viewport.dataset.preview;
       }
       const track = swipeTrack.current;
@@ -545,7 +555,7 @@ export default function Home() {
       const bar = bottomNav.current;
       if (!bar) return;
       const offset = Math.min(Math.abs(start.distance) * .42, 64);
-      bar.dataset.swiping = "";
+      if (bar.dataset.swiping === undefined) bar.dataset.swiping = "";
       bar.toggleAttribute("data-sliding", Boolean(start.preview));
       bar.style.setProperty("--swipe-offset", `${-Math.sign(start.distance) * offset}px`);
       bar.style.setProperty("--swipe-stretch", String(1 + offset / 400));
@@ -877,13 +887,14 @@ export default function Home() {
             <div className="swipe-track" ref={swipeTrack} onTransitionEnd={(event) => {
               if (event.target === event.currentTarget && event.propertyName === "transform") finishSlide.current?.();
             }}>
-              <div className="view-content" key={view} data-direction={viewDirection}>
-                {renderView(view)}
-              </div>
-              {touchNavigation && [-1, 1].map((direction) => {
-                const neighbor = nav[viewIndex + direction];
-                return neighbor && <div key={neighbor.label} className="swipe-preview" data-side={direction > 0 ? "right" : "left"} inert aria-hidden="true">
-                  {renderView(neighbor.label, true)}
+              {nav.map(({ label }, index) => {
+                const current = index === viewIndex;
+                if (!current && (!touchNavigation || Math.abs(index - viewIndex) !== 1)) return null;
+                return <div key={label} className={current ? "view-content" : "swipe-preview"}
+                  data-direction={current ? viewDirection : undefined}
+                  data-side={current ? undefined : index > viewIndex ? "right" : "left"}
+                  inert={!current} aria-hidden={current ? undefined : true}>
+                  {renderView(label, !current)}
                 </div>;
               })}
             </div>
