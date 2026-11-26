@@ -587,7 +587,7 @@ export default function Home() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-view={view}>
       <aside className="sidebar">
         <button className="brand" onClick={() => setDialog("welcome")} aria-label="Bienvenida a Pacta">
           <span className="brand-mark"><CircleDollarSign aria-hidden="true" size={23} strokeWidth={2.1} /></span> pacta<span className="brand-dot">.</span>
