@@ -421,7 +421,7 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 780; letter-spacing: -.05
   transform: translateX(var(--preview-start));
 }
 .swipe-viewport[data-settling] > .swipe-track {
-  transition: transform 140ms cubic-bezier(.2, .75, .25, 1);
+  transition: transform var(--swipe-duration) cubic-bezier(.2, .75, .25, 1);
 }
 .view-content[data-direction] { animation: enter-view 350ms cubic-bezier(.2, .75, .25, 1); }
 .view-content[data-direction="forward"] { --view-entry: 14px; }

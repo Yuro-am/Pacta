@@ -73,7 +73,8 @@ export default function Home() {
     };
   }, []);
   const swipe = useRef<{
-    id: number; x: number; y: number; distance: number; width: number; scrollTop: number; horizontal: boolean; preview?: View;
+    id: number; x: number; y: number; distance: number; paintedDistance: number; width: number; scrollTop: number;
+    horizontal: boolean; preview?: View;
   } | null>(null);
   const [localDebts, setLocalDebts] = useState<Debt[]>([]);
   const [shared, setShared] = useState<{ actor: string; debts: Debt[]; signature?: string } | null>(null);
@@ -458,7 +459,7 @@ export default function Home() {
     const viewport = swipeViewport.current;
     if (!viewport) return;
     swipe.current = {
-      id: event.pointerId, x: event.clientX, y: event.clientY, distance: 0, width: viewport.clientWidth,
+      id: event.pointerId, x: event.clientX, y: event.clientY, distance: 0, paintedDistance: 0, width: viewport.clientWidth,
       scrollTop: Math.max(0, window.scrollY), horizontal: false,
     };
   }
@@ -472,6 +473,7 @@ export default function Home() {
       delete viewport.dataset.settling;
       delete viewport.dataset.preview;
       viewport.style.removeProperty("--swipe-preview-top");
+      viewport.style.removeProperty("--swipe-duration");
     }
     swipeTrack.current?.style.removeProperty("transform");
     const bar = bottomNav.current;
@@ -502,7 +504,7 @@ export default function Home() {
 
     const viewport = swipeViewport.current;
     const track = swipeTrack.current;
-    if (!viewport || !track || !start.preview) {
+    if (!viewport || !track) {
       clearSwipePreview();
       return;
     }
@@ -515,16 +517,19 @@ export default function Home() {
       clearSwipePreview();
       if (next === "Social") void refreshSocial();
     };
-    if (!viewport.dataset.preview || (next && viewport.dataset.preview !== (direction < 0 ? "right" : "left"))
+    const destination = next ? direction * start.width : 0;
+    const remaining = Math.abs(destination - start.paintedDistance);
+    if (remaining < 1 || !viewport.dataset.preview || (next && viewport.dataset.preview !== (direction < 0 ? "right" : "left"))
       || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       complete();
       return;
     }
+    const duration = Math.round(75 + 105 * Math.min(remaining / start.width, 1));
+    viewport.style.setProperty("--swipe-duration", `${duration}ms`);
     viewport.dataset.settling = "";
-    const destination = next ? direction * start.width : 0;
     track.style.transform = `translate3d(${destination}px, 0, 0)`;
     finishSlide.current = complete;
-    swipeTimer.current = window.setTimeout(complete, 180);
+    swipeTimer.current = window.setTimeout(complete, duration + 40);
   }
 
   function moveSwipe(event: ReactPointerEvent<HTMLElement>) {
@@ -547,24 +552,22 @@ export default function Home() {
     const direction = dx < 0 ? 1 : -1;
     const next = nav[viewIndex + direction]?.label;
     start.preview = next;
-    start.distance = next ? -direction * Math.min(Math.abs(dx), start.width) : 0;
+    start.distance = next ? -direction * Math.min(Math.abs(dx), start.width) : dx * 28 / (Math.abs(dx) + 100);
     if (swipeFrame.current !== undefined) return;
     swipeFrame.current = window.requestAnimationFrame(() => {
       swipeFrame.current = undefined;
       if (swipe.current !== start) return;
       const viewport = swipeViewport.current;
       if (viewport) {
-        if (start.preview) {
-          const side = start.distance < 0 ? "right" : "left";
-          if (viewport.dataset.preview !== side) viewport.dataset.preview = side;
-        }
-        else delete viewport.dataset.preview;
+        const side = start.preview && start.distance !== 0 ? start.distance < 0 ? "right" : "left" : "edge";
+        if (viewport.dataset.preview !== side) viewport.dataset.preview = side;
       }
       const track = swipeTrack.current;
       if (track) track.style.transform = `translate3d(${start.distance}px, 0, 0)`;
+      start.paintedDistance = start.distance;
       const bar = bottomNav.current;
       if (!bar) return;
-      const progress = -start.distance / start.width;
+      const progress = start.preview ? -start.distance / start.width : 0;
       if (bar.dataset.swiping === undefined) bar.dataset.swiping = "";
       bar.toggleAttribute("data-sliding", Boolean(start.preview));
       bar.style.setProperty("--swipe-offset", `calc(${progress} * (100% + 6px))`);
@@ -578,7 +581,7 @@ export default function Home() {
     const dx = event.clientX - start.x;
     const direction = Math.sign(dx);
     const next = nav[viewIndex - direction]?.label;
-    if (!start.horizontal || Math.abs(dx) < 18 || next !== start.preview) {
+    if (!start.horizontal || Math.abs(dx) < 18 || !next) {
       settleSwipe();
     } else {
       settleSwipe(next, direction);
