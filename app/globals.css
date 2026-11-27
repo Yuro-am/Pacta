@@ -73,7 +73,7 @@ small { display: block; color: var(--muted); font-size: 12px; }
 .notification { position: relative; }
 .notification i { width: 7px; height: 7px; background: #f6ac78; box-shadow: 0 0 0 2px white; position: absolute; top: 8px; right: 9px; border-radius: 50%; }
 .mobile-brand, .bottom-nav { display: none; }
-.content { width: min(1060px, calc(100% - 68px)); margin: 0 auto; padding: 34px 0 45px; touch-action: pan-y pinch-zoom; }
+.content { width: min(1060px, calc(100% - 68px)); margin: 0 auto; padding: 34px 0 45px; touch-action: pan-y; touch-action: pan-y pinch-zoom; }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 23px; }
 h1, h2, h3, p { margin: 0; }
 h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 780; letter-spacing: -.052em; line-height: 1.12; }
@@ -403,7 +403,7 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 780; letter-spacing: -.05
 
 
 .swipe-track { position: relative; }
-.swipe-viewport { overflow-x: clip; }
+.swipe-viewport[data-preview] { overflow: clip; }
 .swipe-viewport[data-preview] .view-content { animation: none; }
 .swipe-viewport[data-preview] > .swipe-track { will-change: transform; }
 .swipe-preview {
@@ -412,12 +412,14 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 780; letter-spacing: -.05
   inset-inline: 0;
   pointer-events: none;
   visibility: hidden;
-  transform: translateX(var(--preview-start));
 }
 .swipe-preview[data-side="right"] { --preview-start: 100%; }
 .swipe-preview[data-side="left"] { --preview-start: -100%; }
 .swipe-viewport[data-preview="right"] .swipe-preview[data-side="right"],
-.swipe-viewport[data-preview="left"] .swipe-preview[data-side="left"] { visibility: visible; }
+.swipe-viewport[data-preview="left"] .swipe-preview[data-side="left"] {
+  visibility: visible;
+  transform: translateX(var(--preview-start));
+}
 .swipe-viewport[data-settling] > .swipe-track {
   transition: transform 140ms cubic-bezier(.2, .75, .25, 1);
 }

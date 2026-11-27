@@ -529,8 +529,13 @@ export default function Home() {
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
     if (!start.horizontal) {
-      if (Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) return settleSwipe();
-      if (Math.abs(dx) < 4 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+      const horizontal = Math.abs(dx);
+      const vertical = Math.abs(dy);
+      if (vertical >= 8 && vertical >= horizontal) {
+        swipe.current = null;
+        return;
+      }
+      if (horizontal < 8 || horizontal < vertical * 1.5) return;
       start.horizontal = true;
       event.currentTarget.setPointerCapture(event.pointerId);
     }
@@ -878,7 +883,10 @@ export default function Home() {
 
         <div className="content" onPointerDown={startSwipe} onPointerMove={moveSwipe}
           onPointerUp={finishSwipe}
-          onPointerCancel={(event) => { if (swipe.current?.id === event.pointerId) settleSwipe(); }}>
+          onPointerCancel={(event) => { if (swipe.current?.id === event.pointerId) settleSwipe(); }}
+          onLostPointerCapture={(event) => {
+            if (event.target === event.currentTarget && swipe.current?.id === event.pointerId) settleSwipe();
+          }}>
           {sharedError?.actor === userId && sharedError && <p role="status" className="dialog-description">{sharedUnavailable
             ? "Las invitaciones aún no están activadas. Puedes seguir usando tus deudas locales."
             : "No se pudieron cargar las deudas compartidas."}</p>}
