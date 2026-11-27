@@ -41,15 +41,9 @@ export function DebtGesture({ children, open, trash }: {
       if (x > 10 || y > 10) clearTimeout(timer.current);
       if (y > 20 && y >= x) stop();
     }}
-    onPointerUp={(event) => {
-      const start = gesture.current;
-      if (start?.id !== event.pointerId) return;
-      const x = Math.abs(event.clientX - start.x);
-      const y = Math.abs(event.clientY - start.y);
-      if (x >= 55 && x > y * 1.5) reveal();
-      else stop();
-    }}
+    onPointerUp={stop}
     onPointerCancel={stop}
+    onLostPointerCapture={stop}
     onContextMenu={(event) => { if (trash && (gesture.current || triggered.current)) event.preventDefault(); }}>
     {children}
   </button>;

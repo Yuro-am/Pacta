@@ -73,7 +73,7 @@ export default function Home() {
     };
   }, []);
   const swipe = useRef<{
-    id: number; x: number; y: number; distance: number; width: number; horizontal: boolean; preview?: View;
+    id: number; x: number; y: number; distance: number; width: number; scrollTop: number; horizontal: boolean; preview?: View;
   } | null>(null);
   const [localDebts, setLocalDebts] = useState<Debt[]>([]);
   const [shared, setShared] = useState<{ actor: string; debts: Debt[]; signature?: string } | null>(null);
@@ -454,11 +454,12 @@ export default function Home() {
   function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
     if (!touchNavigation || !event.isPrimary || event.pointerType !== "touch" || dialog || swipeTimer.current !== undefined) return;
     if (event.clientX < 20 || event.clientX > window.innerWidth - 20) return;
-    if (!(event.target instanceof Element) || event.target.closest(".can-trash, input, select, textarea, label, [contenteditable]")) return;
+    if (!(event.target instanceof Element) || event.target.closest("input, select, textarea, label, [contenteditable]")) return;
     const viewport = swipeViewport.current;
     if (!viewport) return;
     swipe.current = {
-      id: event.pointerId, x: event.clientX, y: event.clientY, distance: 0, width: viewport.clientWidth, horizontal: false,
+      id: event.pointerId, x: event.clientX, y: event.clientY, distance: 0, width: viewport.clientWidth,
+      scrollTop: Math.max(0, window.scrollY), horizontal: false,
     };
   }
 
@@ -470,6 +471,7 @@ export default function Home() {
     if (viewport) {
       delete viewport.dataset.settling;
       delete viewport.dataset.preview;
+      viewport.style.removeProperty("--swipe-preview-top");
     }
     swipeTrack.current?.style.removeProperty("transform");
     const bar = bottomNav.current;
@@ -507,7 +509,10 @@ export default function Home() {
     }
     const complete = () => {
       // Promote the visible pane before removing the track's final position.
-      if (next) flushSync(() => selectView(next, false));
+      if (next) {
+        flushSync(() => selectView(next, false));
+        window.scrollTo({ top: 0, behavior: "instant" });
+      }
       clearSwipePreview();
       if (next === "Social") void refreshSocial();
     };
@@ -537,6 +542,7 @@ export default function Home() {
       }
       if (horizontal < 8 || horizontal < vertical * 1.5) return;
       start.horizontal = true;
+      swipeViewport.current?.style.setProperty("--swipe-preview-top", `${start.scrollTop}px`);
       event.currentTarget.setPointerCapture(event.pointerId);
     }
     const direction = dx < 0 ? 1 : -1;
@@ -821,7 +827,7 @@ export default function Home() {
       <div className="filters" aria-label="Filtrar actividad">{(["Todo", "Pendientes", "Saldadas"] as const).map((item) =>
         <button key={item} aria-pressed={(preview ? "Todo" : filter) === item} className={(preview ? "Todo" : filter) === item ? "filter-active" : ""} onClick={() => setFilter(item)}>{item}</button>
       )}</div>
-      {(preview ? debts : visibleDebts).some(canTrash) && <p className="trash-hint">Mantén pulsada una deuda o deslízala hacia un lado para moverla a la papelera.</p>}
+      {(preview ? debts : visibleDebts).some(canTrash) && <p className="trash-hint">Mantén pulsada una deuda para moverla a la papelera.</p>}
       {debtList(preview ? debts : visibleDebts)}
       </>}
     </>;
