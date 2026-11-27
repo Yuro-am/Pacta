@@ -56,6 +56,7 @@ export default function Home() {
   const bottomNav = useRef<HTMLElement>(null);
   const swipeViewport = useRef<HTMLDivElement>(null);
   const swipeTrack = useRef<HTMLDivElement>(null);
+  const swipeClaimedClick = useRef(false);
   const viewIndex = nav.findIndex(({ label }) => label === view);
   const [touchNavigation, setTouchNavigation] = useState(false);
   const swipeTimer = useRef<number | undefined>(undefined);
@@ -453,6 +454,7 @@ export default function Home() {
   }
 
   function startSwipe(event: ReactPointerEvent<HTMLElement>) {
+    if (event.isPrimary) swipeClaimedClick.current = false;
     if (!touchNavigation || !event.isPrimary || event.pointerType !== "touch" || dialog || swipeTimer.current !== undefined) return;
     if (event.clientX < 12 || event.clientX > window.innerWidth - 12) return;
     if (!(event.target instanceof Element) || event.target.closest(".topbar, input, select, textarea, label, [contenteditable]")) return;
@@ -524,7 +526,7 @@ export default function Home() {
       complete();
       return;
     }
-    const duration = Math.round(75 + 105 * Math.min(remaining / start.width, 1));
+    const duration = Math.round(65 + 95 * Math.min(remaining / start.width, 1));
     viewport.style.setProperty("--swipe-duration", `${duration}ms`);
     viewport.dataset.settling = "";
     track.style.transform = `translate3d(${destination}px, 0, 0)`;
@@ -544,8 +546,9 @@ export default function Home() {
         swipe.current = null;
         return;
       }
-      if (horizontal < 6 || horizontal < vertical * 1.35) return;
+      if (horizontal < 4 || horizontal < vertical * 1.35) return;
       start.horizontal = true;
+      swipeClaimedClick.current = true;
       swipeViewport.current?.style.setProperty("--swipe-preview-top", `${start.scrollTop}px`);
       event.currentTarget.setPointerCapture(event.pointerId);
     }
@@ -581,7 +584,7 @@ export default function Home() {
     const dx = event.clientX - start.x;
     const direction = Math.sign(dx);
     const next = nav[viewIndex - direction]?.label;
-    if (!start.horizontal || Math.abs(dx) < 18 || !next) {
+    if (!start.horizontal || Math.abs(dx) < 12 || !next) {
       settleSwipe();
     } else {
       settleSwipe(next, direction);
@@ -859,6 +862,12 @@ export default function Home() {
 
       <main className="workspace" onPointerDown={startSwipe} onPointerMove={moveSwipe}
         onPointerUp={finishSwipe}
+        onClickCapture={(event) => {
+          if (!swipeClaimedClick.current || event.detail === 0) return;
+          swipeClaimedClick.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
         onPointerCancel={(event) => { if (swipe.current?.id === event.pointerId) settleSwipe(); }}
         onLostPointerCapture={(event) => {
           if (event.target === event.currentTarget && swipe.current?.id === event.pointerId) settleSwipe();
