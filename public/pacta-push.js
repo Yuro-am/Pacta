@@ -1,8 +1,8 @@
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 
-  const { body, section, tag } = event.data.json();
-  event.waitUntil(self.registration.showNotification("PACTA", {
+  const { title, body, section, tag } = event.data.json();
+  event.waitUntil(self.registration.showNotification(title ?? "PACTA", {
     body,
     tag,
     icon: "/app-icon/192",

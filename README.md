@@ -143,6 +143,8 @@ PACTA puede mostrar notificaciones del sistema con la app cerrada cuando llegan 
 3. En **Supabase → Vault**, crea dos secretos. Guarda como `pacta_push_url` la URL pública completa `https://pacta-azure-nine.vercel.app/push/dispatch` y como `pacta_push_secret` el mismo secreto aleatorio que guardaste en Vercel. Para otro dominio, usa su URL pública con la ruta `/push/dispatch`.
 4. En **Supabase → SQL Editor → New query**, ejecuta [202611220016_mobile_push.sql](supabase/migrations/202611220016_mobile_push.sql) tras las migraciones anteriores.
 
+Para distinguir propuestas, aceptaciones y otros cambios de deuda en las notificaciones del móvil, aplica también [202611220020_mobile_push_debt_events.sql](supabase/migrations/202611220020_mobile_push_debt_events.sql). Puedes aplicar esta migración antes o después de desplegar la aplicación. Las suscripciones existentes siguen funcionando.
+
 ### Activar los avisos en cada móvil
 
 - **Android:** abre PACTA en Chrome, inicia sesión, abre la campana y pulsa **Activar avisos → Permitir**.

@@ -4,11 +4,20 @@ import { sendNotification, WebPushError } from "web-push";
 export const runtime = "nodejs";
 
 const messages = {
-  message: "Tienes un mensaje nuevo.",
-  group_message: "Tienes un mensaje nuevo en un grupo.",
-  debt: "Hay novedades en una deuda.",
-  request: "Tienes una solicitud de amistad.",
-  group_invite: "Te han invitado a un grupo.",
+  message: { title: "Nuevo mensaje", body: "Has recibido un mensaje privado.", section: "messages" },
+  group_message: { title: "Nuevo mensaje de grupo", body: "Hay un mensaje nuevo en uno de tus grupos.", section: "messages" },
+  debt: { title: "Novedad en una deuda", body: "Abre Pacta para ver el cambio.", section: "notifications" },
+  request: { title: "Solicitud de amistad", body: "Alguien quiere añadirte como amigo.", section: "requests" },
+  group_invite: { title: "Invitación a un grupo", body: "Te han invitado a un grupo de Pacta.", section: "requests" },
+} as const;
+
+const debtEvents = {
+  new: { title: "Nueva deuda", body: "Han registrado una deuda contigo." },
+  joined: { title: "Invitación aceptada", body: "Han aceptado tu invitación a compartir una deuda." },
+  proposal: { title: "Nueva propuesta de deuda", body: "Te han enviado una propuesta para saldar una deuda." },
+  accepted: { title: "Propuesta aceptada", body: "Han aceptado tu propuesta para saldar la deuda." },
+  rejected: { title: "Propuesta rechazada", body: "Han rechazado tu propuesta para saldar la deuda." },
+  settled: { title: "Deuda saldada", body: "Se ha confirmado que una deuda está saldada." },
 } as const;
 
 function validEndpoint(endpoint: unknown): endpoint is string {
@@ -40,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   const payload = await request.json().catch(() => null);
-  const { endpoint, p256dh, auth, kind, id } = payload ?? {};
+  const { endpoint, p256dh, auth, kind, id, debt_event: debtEvent } = payload ?? {};
   if (!validEndpoint(endpoint) || typeof p256dh !== "string" || !/^[\w-]{87}$/.test(p256dh)
     || typeof auth !== "string" || !/^[\w-]{22}$/.test(auth)
     || typeof kind !== "string" || !Object.hasOwn(messages, kind)
@@ -48,10 +57,15 @@ export async function POST(request: Request) {
     return new Response(null, { status: 400 });
   }
 
+  const message = messages[kind as keyof typeof messages];
+  const details = kind === "debt" && typeof debtEvent === "string" && Object.hasOwn(debtEvents, debtEvent)
+    ? debtEvents[debtEvent as keyof typeof debtEvents]
+    : message;
   try {
     await sendNotification({ endpoint, keys: { p256dh, auth } }, JSON.stringify({
-      body: messages[kind as keyof typeof messages],
-      section: kind === "request" || kind === "group_invite" ? "requests" : kind === "group_message" ? "messages" : "notifications",
+      title: details.title,
+      body: details.body,
+      section: message.section,
       tag: `${kind}:${id}`,
     }), { vapidDetails: { subject, publicKey, privateKey }, TTL: 3600, timeout: 3500 });
     return new Response(null, { status: 204 });
