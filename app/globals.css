@@ -376,7 +376,6 @@ h1 { font-size: clamp(29px, 3.3vw, 41px); font-weight: 780; letter-spacing: -.05
 .emoji-picker button { min-height: 34px; border-radius: 7px; font-size: 19px; }
 .emoji-picker button:hover { background: var(--surface); }
 
-.icon-button.chat-menu-button { display: inline-flex; width: auto; gap: 5px; padding-inline: 8px; font-size: 13px; font-weight: 750; }
 .message-menu h2 { margin-bottom: 10px; font-size: 18px; }
 .chat-directory-section + .chat-directory-section { margin-top: 14px; }
 .chat-directory-section h3 { margin-bottom: 6px; color: var(--muted); font-size: 13px; }

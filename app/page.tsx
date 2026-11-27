@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { flushSync } from "react-dom";
 import {
-  ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronDown, ChevronRight,
+  ArrowDownLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight,
   CircleDollarSign, CircleHelp, Coffee, Gift, HandHeart, House, LayoutGrid, List, Pizza,
   Plane, Plus, ReceiptText, Sparkles, MessageCircle, UsersRound, Wallet, X, Trash2,
 } from "lucide-react";
@@ -880,14 +880,14 @@ export default function Home() {
               setDialog("notifications"); void refreshInbox();
             }}><Bell size={19} />{unread > 0 && <span className="notification-count">{unread > 99 ? "99+" : unread}</span>}</button>
             {userId && <div className="message-area" ref={messageArea}>
-              <button ref={messageButton} className="icon-button notification chat-menu-button" title="Chats"
+              <button ref={messageButton} className="icon-button notification" title="Chats"
                 aria-label={inbox?.unread_messages ? `Chats (${inbox.unread_messages} sin leer)` : "Chats"}
                 aria-expanded={dialog === "messages"} aria-controls="message-menu"
                 onClick={() => {
                   setDialog(dialog === "messages" ? null : "messages");
                   if (dialog !== "messages") void refreshInbox();
                 }}>
-                <MessageCircle size={18} /><span>Chats</span><ChevronDown size={14} />
+                <MessageCircle size={18} aria-hidden="true" />
                 {Boolean(inbox?.unread_messages) && <span className="notification-count" aria-hidden="true">
                   {(inbox?.unread_messages ?? 0) > 99 ? "99+" : inbox?.unread_messages}
                 </span>}
