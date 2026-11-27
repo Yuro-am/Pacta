@@ -451,10 +451,10 @@ export default function Home() {
     if (next === "Social" && next !== view) void refreshSocial();
   }
 
-  function startSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+  function startSwipe(event: ReactPointerEvent<HTMLElement>) {
     if (!touchNavigation || !event.isPrimary || event.pointerType !== "touch" || dialog || swipeTimer.current !== undefined) return;
-    if (event.clientX < 20 || event.clientX > window.innerWidth - 20) return;
-    if (!(event.target instanceof Element) || event.target.closest("input, select, textarea, label, [contenteditable]")) return;
+    if (event.clientX < 12 || event.clientX > window.innerWidth - 12) return;
+    if (!(event.target instanceof Element) || event.target.closest(".topbar, input, select, textarea, label, [contenteditable]")) return;
     const viewport = swipeViewport.current;
     if (!viewport) return;
     swipe.current = {
@@ -494,8 +494,7 @@ export default function Home() {
       delete bar.dataset.swiping;
       bar.style.removeProperty("--swipe-stretch");
       if (next) {
-        const columns = next === "Actividad" || view === "Actividad" ? 2 : 1;
-        bar.style.setProperty("--swipe-offset", `${-direction * columns * (bar.clientWidth - 10) / 4}px`);
+        bar.style.setProperty("--swipe-offset", `calc(${-direction} * (100% + 6px))`);
       } else {
         bar.style.removeProperty("--swipe-offset");
       }
@@ -528,7 +527,7 @@ export default function Home() {
     swipeTimer.current = window.setTimeout(complete, 180);
   }
 
-  function moveSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+  function moveSwipe(event: ReactPointerEvent<HTMLElement>) {
     const start = swipe.current;
     if (!start || start.id !== event.pointerId) return;
     const dx = event.clientX - start.x;
@@ -540,7 +539,7 @@ export default function Home() {
         swipe.current = null;
         return;
       }
-      if (horizontal < 8 || horizontal < vertical * 1.5) return;
+      if (horizontal < 6 || horizontal < vertical * 1.35) return;
       start.horizontal = true;
       swipeViewport.current?.style.setProperty("--swipe-preview-top", `${start.scrollTop}px`);
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -565,21 +564,21 @@ export default function Home() {
       if (track) track.style.transform = `translate3d(${start.distance}px, 0, 0)`;
       const bar = bottomNav.current;
       if (!bar) return;
-      const offset = Math.min(Math.abs(start.distance) * .42, 64);
+      const progress = -start.distance / start.width;
       if (bar.dataset.swiping === undefined) bar.dataset.swiping = "";
       bar.toggleAttribute("data-sliding", Boolean(start.preview));
-      bar.style.setProperty("--swipe-offset", `${-Math.sign(start.distance) * offset}px`);
-      bar.style.setProperty("--swipe-stretch", String(1 + offset / 400));
+      bar.style.setProperty("--swipe-offset", `calc(${progress} * (100% + 6px))`);
+      bar.style.setProperty("--swipe-stretch", String(1 + Math.sin(Math.abs(progress) * Math.PI) * .15));
     });
   }
 
-  function finishSwipe(event: ReactPointerEvent<HTMLDivElement>) {
+  function finishSwipe(event: ReactPointerEvent<HTMLElement>) {
     const start = swipe.current;
     if (!start || start.id !== event.pointerId) return;
     const dx = event.clientX - start.x;
     const direction = Math.sign(dx);
     const next = nav[viewIndex - direction]?.label;
-    if (!start.horizontal || Math.abs(dx) < 20 || next !== start.preview) {
+    if (!start.horizontal || Math.abs(dx) < 18 || next !== start.preview) {
       settleSwipe();
     } else {
       settleSwipe(next, direction);
@@ -765,7 +764,7 @@ export default function Home() {
     return section === "Inicio" ? <>
       <div className="page-heading">
         <div><h1>¡Hola, {firstName}!</h1></div>
-        <button className="primary heading-action" onClick={() => setDialog("new")}><Plus size={19} /> Nueva deuda</button>
+        <button className="secondary home-add-debt" onClick={() => setDialog("new")}><Plus size={16} aria-hidden="true" /> Nueva deuda</button>
       </div>
 
       <section className="balance" aria-label="Resumen de saldo">
@@ -855,7 +854,12 @@ export default function Home() {
         </div>
       </aside>
 
-      <main className="workspace">
+      <main className="workspace" onPointerDown={startSwipe} onPointerMove={moveSwipe}
+        onPointerUp={finishSwipe}
+        onPointerCancel={(event) => { if (swipe.current?.id === event.pointerId) settleSwipe(); }}
+        onLostPointerCapture={(event) => {
+          if (event.target === event.currentTarget && swipe.current?.id === event.pointerId) settleSwipe();
+        }}>
         <header className="topbar">
           <button className="brand mobile-brand" onClick={() => setDialog("welcome")} aria-label="Bienvenida a Pacta"><span className="brand-mark"><CircleDollarSign aria-hidden="true" size={21} /></span> pacta<span className="brand-dot">.</span></button>
           <span className="top-label">Mi espacio</span>
@@ -887,12 +891,7 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="content" onPointerDown={startSwipe} onPointerMove={moveSwipe}
-          onPointerUp={finishSwipe}
-          onPointerCancel={(event) => { if (swipe.current?.id === event.pointerId) settleSwipe(); }}
-          onLostPointerCapture={(event) => {
-            if (event.target === event.currentTarget && swipe.current?.id === event.pointerId) settleSwipe();
-          }}>
+        <div className="content">
           {sharedError?.actor === userId && sharedError && <p role="status" className="dialog-description">{sharedUnavailable
             ? "Las invitaciones aún no están activadas. Puedes seguir usando tus deudas locales."
             : "No se pudieron cargar las deudas compartidas."}</p>}
@@ -919,7 +918,6 @@ export default function Home() {
       <nav ref={bottomNav} className="bottom-nav" aria-label="Navegación móvil">
         <button onPointerUp={(event) => tapMobileTab(event, "Inicio")} onClick={() => navigate("Inicio")} aria-current={view === "Inicio" ? "page" : undefined} className={view === "Inicio" ? "bottom-active" : ""}><LayoutGrid size={21} /> Inicio</button>
         <button onPointerUp={(event) => tapMobileTab(event, "Social")} onClick={() => navigate("Social")} aria-current={view === "Social" ? "page" : undefined} className={view === "Social" ? "bottom-active" : ""}><UsersRound size={21} /> Social{pendingSocial > 0 && <span className="group-request-count" aria-label={`${pendingSocial} solicitudes pendientes`}>{pendingSocial > 99 ? "99+" : pendingSocial}</span>}</button>
-        <button className="bottom-add" onClick={() => setDialog("new")}><span><Plus size={22} /></span> Añadir</button>
         <button onPointerUp={(event) => tapMobileTab(event, "Actividad")} onClick={() => navigate("Actividad")} aria-current={view === "Actividad" ? "page" : undefined} className={view === "Actividad" ? "bottom-active" : ""}><List size={22} /> Actividad</button>
       </nav>
 
